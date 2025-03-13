@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Display a map</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
+    <script src="index.js"></script>
+    <link
+      href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      var demSource = new mlcontour.DemSource({
+        url: "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png",
+        encoding: "terrarium",
+        maxzoom: 13,
+      });
+
+      // calls maplibregl.addProtocol for the shared cache and contour protocols
+      demSource.setupMaplibre(maplibregl);
+
+      var map = new maplibregl.Map({
+        container: "map",
+        zoom: 12.55,
+        center: [86.92731, 27.97797],
+        hash: true,
+        style: {
+          version: 8,
+          glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+          sources: {
+            dem: {
+              type: "raster-dem",
+              encoding: "terrarium",
+              tiles: [demSource.sharedDemProtocolUrl], // share cached DEM tiles with contour layer
+              maxzoom: 13,
+              tileSize: 256,
+            },
+            contourSourceFeet: {
+                  type: 'vector',
+                  tiles: [
+                      demSource.contourProtocolUrl({
+                      // meters to feet
+                          multiplier: 3.28084,
+                          overzoom: 1,
+                          thresholds: {
+                          // zoom: [minor, major]
+                      
+                          9: [100, 500],
+                          10: [100, 500],
+                          11: [100, 500],
+                              12: [100, 500],
+                              13: [100, 500],
+                              14: [50, 200],
+                              15: [20, 100]
+                          },
+                          elevationKey: 'ele',
+                          levelKey: 'level',
+                          contourLayer: 'contours'
+                      })
+                    ],
+                    maxzoom: 15
+                }
+          },
+
+          layers: [
+            {
+              id: "hills",
+              type: "hillshade",
+              source: "dem",
+              paint: {
+                "hillshade-exaggeration": 0.25,
+              },
+            },
+            {
+              id: "contours",
+              type: "line",
+              source: "contourSourceFeet",
+              "source-layer": "contours",
+              paint: {
+                "line-color": "rgba(0,0,0, 50%)",
+                "line-width": ["match", ["get", "level"], 1, 1, 0.5],
+              },
+              layout: {
+                "line-join": "round",
+              },
+            },
+
+            {
+                    id: 'contoursLayers',
+                    // type: 'line',
+                    type: 'fill',
+                    source: 'contourSourceFeet',
+                    'source-layer': 'contours',
+                    //filter: ['<', ['get', 'elev'], 3400],
+                    paint: {
+                        // "line-width": 1,
+                        // "line-color": "#f00",
+                        //'fill-color': "#f00",  
+                        
+                        'fill-color': ['match', ['get', 'delta'], +600, "#f00" ,+300,"#FF8900", 0,"#FFD500", -300,"#8AC37B",-600,"#42C422" , "#007"],  
+                    
+                        'fill-opacity': 0.3,
+                        //'fill-pattern': 'pattern'
+                        // "major" contours have level=1, "minor" have level=0
+                        //'line-width': ['match', ['get', 'level'], 1, 1, 0.5]
+                    }
+                },
+
+            {
+              id: "contour-text",
+              type: "symbol",
+              source: "contourSourceFeet",
+              "source-layer": "contours",
+              filter: [">", ["get", "level"], 0],
+              paint: {
+                "text-halo-color": "white",
+                "text-halo-width": 1,
+              },
+              layout: {
+                "symbol-placement": "line",
+                "text-anchor": "center",
+                "text-size": 10,
+                "text-field": [
+                  "concat",
+                  ["number-format", ["get", "ele"], {}],
+                  "'",
+                ],
+                "text-font": ["Noto Sans Bold"],
+              },
+            },
+          ],
+        },
+      });
+    </script>
+  </body>
+</html>
