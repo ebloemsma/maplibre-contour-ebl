@@ -3,6 +3,7 @@
     "target": "ES2016",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "strict": true,
+    "noImplicitAny": false,
     "moduleResolution": "Bundler",
     "allowJs": true,
     "skipLibCheck": false,
@@ -11,7 +12,8 @@
     "isolatedModules": true,
     "module": "ESNext",
     "esModuleInterop": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "sourceMap": true,
   },
   "ts-node": {
     "experimentalSpecifierResolution": "node",
