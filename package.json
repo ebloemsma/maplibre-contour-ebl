@@ -71,5 +71,8 @@
     "typescript": "5.7.3",
     "typescript-eslint": "8.21.0",
     "whatwg-fetch": "3.6.20"
+  },
+  "dependencies": {
+    "rollup-plugin-sourcemaps": "^0.6.3"
   }
 }
