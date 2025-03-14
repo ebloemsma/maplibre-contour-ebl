@@ -16,6 +16,9 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 */
 
+
+import * as ispolygons from './isopolygons';
+
 import type { HeightTile } from "./height-tile";
 
 class Fragment {
@@ -179,6 +182,8 @@ export default function generateIsolines(
   tile: HeightTile,
   extent: number = 4096,
   buffer: number = 1,
+  gpwslevels?: number[],
+  x?, y?, z?
 ): { [ele: number]: number[][] } {
   if (!interval) {
     return {};
@@ -189,6 +194,13 @@ export default function generateIsolines(
   const segments: { [ele: string]: number[][] } = {};
   const fragmentByStartByLevel: Map<number, Map<number, Fragment>> = new Map();
   const fragmentByEndByLevel: Map<number, Map<number, Fragment>> = new Map();
+
+  //ISOPOLYS: need this to identify edges
+  const minXY = multiplier * (0 - 1);
+  const maxXY = 4096 + Math.abs(minXY);
+  const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y);
+  fullTile.minXY = minXY;
+  fullTile.maxXY = maxXY;
 
   function interpolate(
     point: [number, number],
@@ -240,6 +252,15 @@ export default function generateIsolines(
       const max = Math.max(maxL, maxR);
       const start = Math.ceil(min / interval) * interval;
       const end = Math.floor(max / interval) * interval;
+
+      //ISOPOLY: set tile ma x and min elevation
+      const maxElev = Math.max(tld, trd, bld, brd)
+      const minElev = Math.min(tld, trd, bld, brd)
+      fullTile.max = Math.max(fullTile.max || 0, maxElev);
+      fullTile.min = Math.min(fullTile.min || Number.MAX_SAFE_INTEGER, minElev);
+      //fullTile.setMin(minElev)
+      //convertTileIsolinesToPolygonsfullTile.setMin(minElev)
+
       for (let threshold = start; threshold <= end; threshold += interval) {
         const tl = tld > threshold;
         const tr = trd > threshold;
@@ -317,5 +338,54 @@ export default function generateIsolines(
     }
   }
 
+
+  // ISOPOLY: convert lines to polygons
+  if (gpwslevels) {
+
+    console.log(`create tile isopolys:`, fullTile.toString())
+
+    console.log("- segements:", segments)
+
+    try {
+      const polygons: ispolygons.ElevationLinesMap = {};
+      for (const elevationLevel of gpwslevels ) {
+        const levelIsoLines = segments[elevationLevel]
+        const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, levelIsoLines, fullTile);
+
+        if(polys.length>0) polygons[elevationLevel] = polys;
+      }
+
+      //console.log("- ispolys:", polygons);
+
+      const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, gpwslevels, polygons, minXY, maxXY, x, y, z)
+
+      // if (Object.keys(fullTilePolys).length) {
+      //   // console.log("fullTilePolys",fullTilePolys );
+      //   console.log(`- fullTilePolys`, fullTilePolys)
+      // }
+
+      //mergeElevationMaps(polygons, fullTilePolys)
+
+      console.log("- final:",polygons);
+      return polygons;
+
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
   return segments;
+}
+
+/**
+ * 
+ * @param map1 merges an ElevLineMap onto another. changes the map1 object
+ * @param map2 
+ */
+function mergeElevationMaps(map1: ispolygons.ElevationLinesMap, map2: ispolygons.ElevationLinesMap) {
+  
+  for (const [lvl, map2Lines] of Object.entries(map2)) {
+    map1[lvl].push( map2Lines );
+  }
+  
 }

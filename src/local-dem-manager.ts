@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import encodeVectorTile, { GeomType } from "./vtpbf";
 import { Timer } from "./performance";
+import { classifyRings } from "@mapbox/vector-tile";
 
 const defaultGetTile: GetTileFunction = async (
   url: string,
@@ -219,11 +220,25 @@ export class LocalDemManager implements DemManager {
           .scaleElevation(multiplier)
           .materialize(1);
 
+          // ISOPOLYS: define layers
+          const currAlt = 17000;
+                const gpwslevels = [
+                    //10000,
+                    currAlt + 600,
+                    currAlt + 300,
+                    currAlt,
+                    currAlt - 300,
+                    currAlt - 600,
+                    //0,
+                ];
+
         const isolines = generateIsolines(
           levels[0],
           virtualTile,
           extent,
           buffer,
+          gpwslevels
+          ,x,y,z
         );
 
         mark?.();
@@ -233,6 +248,13 @@ export class LocalDemManager implements DemManager {
             [contourLayer]: {
               features: Object.entries(isolines).map(([eleString, geom]) => {
                 const ele = Number(eleString);
+
+                //ISOPOLYS: calc delta value and extend props
+                const deltaAlt = ele - currAlt;
+                const propsIsoPolys = {
+                  ["delta"]: deltaAlt,
+                }
+
                 return {
                   type: GeomType.LINESTRING,
                   geometry: geom,
@@ -241,6 +263,7 @@ export class LocalDemManager implements DemManager {
                     [levelKey]: Math.max(
                       ...levels.map((l, i) => (ele % l === 0 ? i : 0)),
                     ),
+                    ...propsIsoPolys
                   },
                 };
               }),
