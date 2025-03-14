@@ -47,6 +47,14 @@ function findBorder(x, y, minXY, maxXY) {
     let bottom = y == maxXY;
 
     let code = (top ? 1 : 0 | (right ? 2 : 0) | (bottom ? 4 : 0) | (left ? 8 : 0));
+
+    // hack to fix corner points
+    if ( code == 6) code = 2;
+    if ( code == 12) code = 4;
+    if ( code == 3) code = 1;
+    if ( code == 9) code = 8;
+    
+
     return code;
 }
 

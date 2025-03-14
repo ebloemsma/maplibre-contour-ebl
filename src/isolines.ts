@@ -341,10 +341,10 @@ export default function generateIsolines(
 
   // ISOPOLY: convert lines to polygons
   if (gpwslevels) {
+    const dbg=false
+    if(dbg) console.log(`create tile isopolys:`, fullTile.toString())
 
-    console.log(`create tile isopolys:`, fullTile.toString())
-
-    console.log("- segements:", segments)
+    if(dbg) console.log("- segements:", segments)
 
     try {
       const polygons: ispolygons.ElevationLinesMap = {};
@@ -359,14 +359,14 @@ export default function generateIsolines(
 
       const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, gpwslevels, polygons, minXY, maxXY, x, y, z)
 
-      // if (Object.keys(fullTilePolys).length) {
-      //   // console.log("fullTilePolys",fullTilePolys );
-      //   console.log(`- fullTilePolys`, fullTilePolys)
-      // }
+      if (Object.keys(fullTilePolys).length) {
+        // console.log("fullTilePolys",fullTilePolys );
+        if(dbg) console.log(`- fullTilePolys`, fullTilePolys)
+      }
 
-      //mergeElevationMaps(polygons, fullTilePolys)
+      mergeElevationMaps(polygons, fullTilePolys)
 
-      console.log("- final:",polygons);
+      if(dbg) console.log("- final:",polygons);
       return polygons;
 
     } catch (e) {
@@ -385,7 +385,8 @@ export default function generateIsolines(
 function mergeElevationMaps(map1: ispolygons.ElevationLinesMap, map2: ispolygons.ElevationLinesMap) {
   
   for (const [lvl, map2Lines] of Object.entries(map2)) {
-    map1[lvl].push( map2Lines );
+    if ( !map1[lvl]) map1[lvl] = [];
+    map1[lvl].push( ...map2Lines );
   }
   
 }
