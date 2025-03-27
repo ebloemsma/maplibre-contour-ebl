@@ -97,6 +97,7 @@ export class DemSource {
   manager: DemManager;
   sharedDemProtocolUrl: string;
   timingCallbacks: Array<(timing: Timing) => void> = [];
+  SetGPWSConfig?: Function;
 
   constructor({
     url,
@@ -225,6 +226,10 @@ export class DemSource {
     try {
       const [z, x, y] = this.parseUrl(request.url);
       const options = decodeOptions(request.url);
+
+      //POLYLINES
+      if ( this.SetGPWSConfig ) options.gpwsConfig = this.SetGPWSConfig();
+
       const data = await this.manager.fetchContourTile(
         z,
         x,
@@ -233,6 +238,10 @@ export class DemSource {
         abortController,
         timer,
       );
+
+
+      
+
       timing = timer.finish(request.url);
       return { data: data.arrayBuffer };
     } catch (error) {

@@ -57,6 +57,13 @@ export interface ContourTileOptions {
   buffer?: number;
   /** When overzooming tiles, subsample to scale up to at least this size to make the contour lines smoother at higher zooms. */
   subsampleBelow?: number;
+
+  gpwsConfig?: GPWSConfig; 
+}
+
+export type GPWSConfig = {
+  referenceAltitude: number;
+  levels : [ number ]
 }
 
 export interface GlobalContourTileOptions extends ContourTileOptions {
@@ -69,10 +76,12 @@ export interface GlobalContourTileOptions extends ContourTileOptions {
    * this array that the elevation is a multiple of.
    */
   thresholds: { [n: number]: number | number[] };
+  
 }
 
 export interface IndividualContourTileOptions extends ContourTileOptions {
   levels: number[];
+  
 }
 
 export interface Image {

@@ -622,6 +622,54 @@ class LineIndex {
     }
 
     /**
+     * returns corners to connect line2 start after line1 end
+     * @param line1 
+     * @param line2 
+     * @param minXY 
+     * @param maxXY 
+     * @returns 
+     */
+    getTileCornersCounterClockWiseBetweenLines(line1, line2, minXY, maxXY) {
+        const sameEdge = this.lineFollowsCounterClockwiseOnSameEdge(line1,line2);
+
+        if(sameEdge) {
+            //console.log(`corner sameEdge`)
+            return LineIndex.getTileCornersCounterClockWiseCount(line1.brd.end, 4, minXY, maxXY);
+        }
+        return this.getTileCornersCounterClockWise( line1.brd.end, line2.brd.start,minXY,maxXY );
+    }
+
+
+    /**
+     * check if line2 starts on same edge as line1 ends in counterclockwise direction 
+     * 
+     * @param {*} line1 
+     * @param {*} line2 
+     * @returns 
+     */
+    lineFollowsCounterClockwiseOnSameEdge(line1,line2) {
+        if (line1.brd.end != line2.brd.start)
+            return false; //throw new Error("isEndBeforeStartSameEdge: not on same edge");
+        
+        const end = line1.end;
+        const start = line2.start;
+
+        //console.log(`isEndBefStartSame l1,l2 `,line1.clone(),line2.clone() )
+        //console.log(`isEndBefStartSame: `,end, start )
+
+        const edge = line1.brd.end;
+        if (edge == 1)
+            return (end.x < start.x && end.y == start.y);
+        else if (edge == 2)
+            return (end.y < start.y && end.x == start.x);
+        else if (edge == 4)
+            return (end.x > start.x && end.y == start.y);
+        else if (edge == 8)
+            return (end.y > start.y && end.x == start.x);
+        throw new Error("isEndBeforeStartSameEdge error");
+    }
+
+    /**
      * checks if the end point is on the same edge but before (counterclockwise) from start
      * 
      * @param {*} line 
@@ -728,8 +776,11 @@ class LineIndex {
             // buffLine is appended 
 
             // buffline start will always be before
-            const lineEndEdge = line.brd.end
-            const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
+            //const lineEndEdge = line.brd.end
+            //const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
+            
+            const corners = this.getTileCornersCounterClockWiseBetweenLines(line, buffLine, minXY, maxXY);
+
             if (dbg) console.log("appendLinesToClone - add corners: ", corners)
 
             // insert corners if req

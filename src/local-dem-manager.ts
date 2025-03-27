@@ -174,6 +174,9 @@ export class LocalDemManager implements DemManager {
       subsampleBelow = 100,
     } = options;
 
+    console.log(`FETCH#`, options)
+    
+
     // no levels means less than min zoom with levels specified
     if (!levels || levels.length === 0) {
       return Promise.resolve({ arrayBuffer: new ArrayBuffer(0) });
@@ -221,16 +224,20 @@ export class LocalDemManager implements DemManager {
           .materialize(1);
 
           // ISOPOLYS: define layers
-          const currAlt = 17000;
-                const gpwslevels = [
-                    //10000,
-                    currAlt + 600,
-                    currAlt + 300,
-                    currAlt,
-                    currAlt - 300,
-                    currAlt - 600,
-                    //0,
-                ];
+          //const currAlt = 17000;
+          const gpwsCfg = options.gpwsConfig;
+
+          const gpwslevels = gpwsCfg?.levels
+          
+          // [
+          //     //10000,
+          //     currAlt + 600,
+          //     currAlt + 300,
+          //     currAlt,
+          //     currAlt - 300,
+          //     currAlt - 600,
+          //     //0,
+          // ];
 
         const isolines = generateIsolines(
           levels[0],
@@ -250,11 +257,12 @@ export class LocalDemManager implements DemManager {
                 const ele = Number(eleString);
 
                 //ISOPOLYS: calc delta value and extend props
-                const deltaAlt = ele - currAlt;
+                
+                const deltaAlt =  gpwsCfg ? ele - gpwsCfg?.referenceAltitude : 0;
                 const propsIsoPolys = {
                   ["delta"]: deltaAlt,
                 }
-
+                
                 return {
                   type: GeomType.LINESTRING,
                   geometry: geom,
