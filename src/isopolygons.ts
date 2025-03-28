@@ -942,8 +942,10 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
             }
         }
     }
-    
+
     for (let line of lines) {
+        // if (lvl==2500) findAbnormal(line)
+
         //line = checkLine(line, minXY,maxXY)
         // console.log(line)
         // newLines.push( line );
