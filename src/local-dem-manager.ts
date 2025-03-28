@@ -174,7 +174,7 @@ export class LocalDemManager implements DemManager {
       subsampleBelow = 100,
     } = options;
 
-    console.log(`FETCH#`, options)
+    // console.log(`FETCH options`, options)
     
 
     // no levels means less than min zoom with levels specified

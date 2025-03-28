@@ -250,6 +250,9 @@ export default function generateIsolines(
       if (isNaN(tld) || isNaN(trd) || isNaN(brd) || isNaN(bld)) {
         continue;
       }
+
+      const lowCutout = 0
+
       const min = Math.min(minL, minR);
       const max = Math.max(maxL, maxR);
       const start = Math.ceil(min / interval) * interval;
@@ -264,6 +267,9 @@ export default function generateIsolines(
       //convertTileIsolinesToPolygonsfullTile.setMin(minElev)
 
       for (let threshold = start; threshold <= end; threshold += interval) {
+
+        if ( lowCutout != undefined && threshold < lowCutout ) continue;
+
         const tl = tld > threshold;
         const tr = trd > threshold;
         const bl = bld > threshold;
@@ -343,33 +349,33 @@ export default function generateIsolines(
 
   // ISOPOLY: convert lines to polygons
   if (gpwslevels) {
-    const dbg=false
+    const dbg=(1==1)
     if(dbg) console.log(`create tile isopolys:`, fullTile.toString())
 
     if(dbg) console.log("- segements:", segments)
 
     try {
-      const polygons: ispolygons.ElevationLinesMap = {};
+      const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
       for (const elevationLevel of gpwslevels ) {
         const levelIsoLines = segments[elevationLevel]
         const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, levelIsoLines, fullTile);
 
-        if(polys.length>0) polygons[elevationLevel] = polys;
+        if(polys.length>0) isoPolygonsMap[elevationLevel] = polys;
       }
+      if(dbg) console.log("isoPolygonsMap",isoPolygonsMap );
 
-      //console.log("- ispolys:", polygons);
-
-      const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, gpwslevels, polygons, minXY, maxXY, x, y, z)
+      const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, gpwslevels, isoPolygonsMap, minXY, maxXY, x, y, z)
 
       if (Object.keys(fullTilePolys).length) {
         // console.log("fullTilePolys",fullTilePolys );
         if(dbg) console.log(`- fullTilePolys`, fullTilePolys)
       }
 
-      mergeElevationMaps(polygons, fullTilePolys)
+      const mergedPolys = mergeElevationMaps(isoPolygonsMap, fullTilePolys)
 
-      if(dbg) console.log("- final:",polygons);
-      return polygons;
+      if(dbg) console.log("- mergedPolys:",mergedPolys);
+
+      return mergedPolys;
 
     } catch (e) {
       console.log(e);
@@ -385,10 +391,28 @@ export default function generateIsolines(
  * @param map2 
  */
 function mergeElevationMaps(map1: ispolygons.ElevationLinesMap, map2: ispolygons.ElevationLinesMap) {
-  
-  for (const [lvl, map2Lines] of Object.entries(map2)) {
-    if ( !map1[lvl]) map1[lvl] = [];
-    map1[lvl].push( ...map2Lines );
-  }
-  
+    const merged = {};
+    
+    const lowCutout = 0
+
+    for (const [lvlStr, lines] of Object.entries(map1)) {
+        const lvl = Number(lvlStr)
+        if( lowCutout != undefined && lvl < lowCutout) continue;
+        if (!merged[lvl])
+            merged[lvl] = [];
+        //console.log("merged--",{...merged})
+        merged[lvl].push(...lines);
+    }
+    //console.log("entries",Object.entries(map2))
+    for (const [lvlStr, lines ] of Object.entries(map2)) {
+        // console.log("lvl,merged",lvl,{...merged})
+        const lvl = Number(lvlStr)
+        if(lowCutout != undefined &&  lvl < 0) continue;
+        if (!merged[lvl])
+            merged[lvl] = [];
+        //console.log("merged--",{...merged})
+        merged[lvl].push(...lines );
+    }
+    return merged;
+
 }

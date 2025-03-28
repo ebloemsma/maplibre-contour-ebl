@@ -932,6 +932,17 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
         // newLines.push( line );
     }
 
+    function findAbnormal(line){
+        for ( let i=0; i<line.length; i+=2 ){
+            const x = line[0]
+            const y = line[1]
+            console.log(x,y)
+            if (x == -32 && y == -32 ) {
+                console.log(`abnormal lt at ${i}`, line)
+            }
+        }
+    }
+    
     for (let line of lines) {
         //line = checkLine(line, minXY,maxXY)
         // console.log(line)
