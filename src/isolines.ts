@@ -20,6 +20,7 @@ THIS SOFTWARE.
 import * as ispolygons from './isopolygons';
 
 import type { HeightTile } from "./height-tile";
+import type { IsolineOptions } from './types';
 
 class Fragment {
   start: number;
@@ -167,12 +168,6 @@ function ratio(a: number, b: number, c: number) {
   return (b - a) / (c - a);
 }
 
-export type IsoOptions = {
-    levels?: number [],
-    interval? : number,
-    deltaReference? : number,
-    polygons? : boolean,
-}
 
 /**
  * Generates contour lines from a HeightTile
@@ -185,11 +180,10 @@ export type IsoOptions = {
  * contour lines in tile coordinates
  */
 export default function generateIsolines(
-  isoOptions: IsoOptions,
+  isoOptions: IsolineOptions,
   tile: HeightTile,
   extent: number = 4096,
   buffer: number = 1,
-  gpwslevels?: number[],
   x?, y?, z?
 ): { [ele: number]: number[][] } {
   // if (!interval) {
@@ -280,8 +274,6 @@ export default function generateIsolines(
       if (isNaN(tld) || isNaN(trd) || isNaN(brd) || isNaN(bld)) {
         continue;
       }
-
-      const lowCutout = 0
 
       const min = Math.min(minL, minR);
       const max = Math.max(maxL, maxR);
@@ -392,35 +384,34 @@ export default function generateIsolines(
     }
   }
 
-  if(dbg) console.log(`create isopolys:`, fullTile.toString())
+  
 
   // ISOPOLY: convert lines to polygons
-  if (gpwslevels) {
+  if ( isoOptions.polygons ) {
     
-
-    // if(dbg) console.log("- segements:", segments)
+    if(dbg) console.log(`create isopolys:`, fullTile.toString())
 
     try {
       const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
-      for (const elevationLevel of gpwslevels ) {
-        const levelIsoLines = segments[elevationLevel]
-        const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, levelIsoLines, fullTile);
 
+      for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
+        // const levelIsoLines = segments[elevationLevel]
+        const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, elevationIsoLines, fullTile);
         if(polys.length>0) isoPolygonsMap[elevationLevel] = polys;
       }
       if(dbg) console.log("isoPolygonsMap",isoPolygonsMap );
 
-      const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, gpwslevels, isoPolygonsMap, minXY, maxXY, x, y, z)
-
+      // generate full tile polys
+      const levels = isoOptions.levels;
+      const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z)
       if (Object.keys(fullTilePolys).length) {
         // console.log("fullTilePolys",fullTilePolys );
         if(dbg) console.log(`- fullTilePolys`, fullTilePolys)
       }
-
       const mergedPolys = mergeElevationMaps(isoPolygonsMap, fullTilePolys)
 
-      if(dbg) console.log("- mergedPolys:",mergedPolys);
 
+      if(dbg) console.log("- mergedPolys:",mergedPolys);
       return mergedPolys;
 
     } catch (e) {

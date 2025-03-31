@@ -97,7 +97,7 @@ export class DemSource {
   manager: DemManager;
   sharedDemProtocolUrl: string;
   timingCallbacks: Array<(timing: Timing) => void> = [];
-  SetGPWSConfig?: Function;
+  GetOptions?: Function;
 
   constructor({
     url,
@@ -225,10 +225,15 @@ export class DemSource {
     let timing: Timing;
     try {
       const [z, x, y] = this.parseUrl(request.url);
-      const options = decodeOptions(request.url);
+      const reqOptions = decodeOptions(request.url);
 
-      //POLYLINES
-      if ( this.SetGPWSConfig ) options.gpwsConfig = this.SetGPWSConfig();
+      //POLYLINES      
+      let overrideOptions = null;
+      if (this.GetOptions) {
+          overrideOptions = this.GetOptions({z,x,y});
+      }
+
+      const options = Object.assign( {}, reqOptions, overrideOptions )
 
       const data = await this.manager.fetchContourTile(
         z,

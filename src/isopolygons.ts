@@ -106,7 +106,7 @@ function getLineBorderCode(line: LineDefinition, minXY, maxXY) {
 
 
 
-export function generateFullTileIsoPolygons(fullTile: TileInformation, gpwslevels, segm, minXY, maxXY, x, y, z) {
+export function generateFullTileIsoPolygons(fullTile: TileInformation, levels, minXY, maxXY, x, y, z) {
     
     // console.log("ADD FULL:",fullTile,gpwslevels)
 
@@ -115,7 +115,7 @@ export function generateFullTileIsoPolygons(fullTile: TileInformation, gpwslevel
 
     const fullTilePolygons : ElevationLinesMap = {};
 
-    for (const lvl of gpwslevels) {
+    for (const lvl of levels) {
 
         if (fullTile.min >= lvl) {
             const polygon = LineIndex.getFullTilePolygon(minXY, maxXY);

@@ -1,7 +1,7 @@
 import AsyncCache from "./cache";
 import defaultDecodeImage from "./decode-image";
 import { HeightTile } from "./height-tile";
-import generateIsolines, { type IsoOptions } from "./isolines";
+import generateIsolines from "./isolines";
 import { encodeIndividualOptions, isAborted, withTimeout } from "./utils";
 import type {
   ContourTile,
@@ -223,43 +223,28 @@ export class LocalDemManager implements DemManager {
           .scaleElevation(multiplier)
           .materialize(1);
 
-          // ISOPOLYS: define layers
-          //const currAlt = 17000;
-          const gpwsCfg = options.gpwsConfig;
+  
 
-          const gpwslevels = gpwsCfg?.levels
-          
-          // [
-          //     //10000,
-          //     currAlt + 600,
-          //     currAlt + 300,
-          //     currAlt,
-          //     currAlt - 300,
-          //     currAlt - 600,
-          //     //0,
-          // ];
-
-        const isoOptions = {
-            levels: [ -300, 0, 400],
-            interval : 100, //levels[0]
-            polygons: false,
-            deltaReference: 0,
-        } as IsoOptions;
+        // const isoOptions = {
+        //     levels: [ -300, 0, 400],
+        //     interval : 100, //levels[0]
+        //     polygons: false,
+        //     deltaReference: 0,
+        // } as IsoOptions;
 
         const isolines = generateIsolines(
-          isoOptions,
+          options,
           virtualTile,
           extent,
-          buffer,
-          gpwslevels
+          buffer
           ,x,y,z
         );
 
-        const geomType = (isoOptions.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
+        const geomType = (options.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
 
         // natural ordering will messe up ordering if negative levels are involved
         const isoLinesKeysSorted = Object.keys(isolines).map( a => Number(a)).sort( (a,b) => a-b);
-
+        
         mark?.();
         const result = encodeVectorTile({
           extent,
@@ -276,17 +261,21 @@ export class LocalDemManager implements DemManager {
                 }
 
                 //ISOPOLYS: calc delta value and extend props
-                const deltaAlt = (isoOptions.deltaReference!=undefined) ? ele - isoOptions.deltaReference : undefined ;
+                const deltaAlt = (options.deltaReference!=undefined) ? ele - options.deltaReference : undefined ;
                 const deltaProps = (deltaAlt!=undefined)? {
                     delta: deltaAlt,
                 }:{}
 
-            
+                const levelDef = options.levelDef?.find( e => Number(e.level)==ele )
+                const levelProps = (levelDef)?levelDef.props:{}
+
+                const properties = Object.assign( baseProps, deltaProps,levelProps)
+                // console.log(properties)
 
                 return {
                     type: geomType,
                     geometry: geom,
-                    properties: Object.assign( baseProps, deltaProps),
+                    properties: properties,
                 };
 
               }),

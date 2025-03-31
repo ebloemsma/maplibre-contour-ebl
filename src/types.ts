@@ -79,10 +79,19 @@ export interface GlobalContourTileOptions extends ContourTileOptions {
   
 }
 
-export interface IndividualContourTileOptions extends ContourTileOptions {
-  levels: number[];
-  
+export interface IsolineOptions  {
+  levels?: number [],
+  levelDef?: [{
+    level: number,
+    props: Record<string,any>
+  }]
+  interval? : number,
+  deltaReference? : number,
+  polygons? : boolean,
 }
+
+export interface IndividualContourTileOptions extends ContourTileOptions,IsolineOptions {
+} 
 
 export interface Image {
   width: number;
