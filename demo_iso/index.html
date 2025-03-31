@@ -6,7 +6,7 @@
   <title>Display a map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
-  <script src="../dist/index.js"></script>
+  <script src="./demo_iso/index.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     body {
@@ -130,19 +130,21 @@
       -2000
     ]
 
-    let SelectedGPWSAltitude = 500;
+    let SelectedGPWSAltitude = 200;
     demSource.GetOptions = ( tileCoords ) => {
         
+        const levels = gpwsLevelsCfg.map( rl => rl + SelectedGPWSAltitude);
         const config = {
-           min: -300,
-           max: 1000,
-           levels : [ -100, +300, +500]
+          levels, //[2500] ,//[ -300, 0,100, 400],
+          interval : 100, //levels[0]
+          polygons: true,
+          deltaReference: SelectedGPWSAltitude, //400,
         }
 
-        const gpwsCfg =  {
-          referenceAltitude: SelectedGPWSAltitude,
-          levels: gpwsLevelsCfg.map( rl => rl + SelectedGPWSAltitude),
-        };
+        // const gpwsCfg =  {
+        //   referenceAltitude: SelectedGPWSAltitude,
+        //   levels: gpwsLevelsCfg.map( rl => rl + SelectedGPWSAltitude),
+        // };
 
         //console.log("##GetOptions",tileCoords, config)
         return config;
