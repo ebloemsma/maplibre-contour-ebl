@@ -1,7 +1,7 @@
 import AsyncCache from "./cache";
 import defaultDecodeImage from "./decode-image";
 import { HeightTile } from "./height-tile";
-import generateIsolines from "./isolines";
+import generateIsolines, { type IsoOptions } from "./isolines";
 import { encodeIndividualOptions, isAborted, withTimeout } from "./utils";
 import type {
   ContourTile,
@@ -239,14 +239,23 @@ export class LocalDemManager implements DemManager {
           //     //0,
           // ];
 
+        const isoOptions = {
+            levels: [ -300, 0, 400],
+            interval : 100, //levels[0]
+            polygons: false,
+            deltaReference: 0,
+        } as IsoOptions;
+
         const isolines = generateIsolines(
-          levels[0],
+          isoOptions,
           virtualTile,
           extent,
           buffer,
           gpwslevels
           ,x,y,z
         );
+
+        const geomType = (isoOptions.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
 
         mark?.();
         const result = encodeVectorTile({
@@ -256,24 +265,25 @@ export class LocalDemManager implements DemManager {
               features: Object.entries(isolines).map(([eleString, geom]) => {
                 const ele = Number(eleString);
 
-                //ISOPOLYS: calc delta value and extend props
-                
-                const deltaAlt =  gpwsCfg ? ele - gpwsCfg?.referenceAltitude : 0;
-                const propsIsoPolys = {
-                  ["delta"]: deltaAlt,
+                const baseProps = { 
+                    [elevationKey]: ele, 
+                    [levelKey]: Math.max(...levels.map((l, i) => (ele % l === 0 ? i : 0))) 
                 }
-                
+
+                //ISOPOLYS: calc delta value and extend props
+                const deltaAlt = (isoOptions.deltaReference!=undefined) ? ele - isoOptions.deltaReference : undefined ;
+                const deltaProps = (deltaAlt!=undefined)? {
+                    delta: deltaAlt,
+                }:{}
+
+            
+
                 return {
-                  type: GeomType.LINESTRING,
-                  geometry: geom,
-                  properties: {
-                    [elevationKey]: ele,
-                    [levelKey]: Math.max(
-                      ...levels.map((l, i) => (ele % l === 0 ? i : 0)),
-                    ),
-                    ...propsIsoPolys
-                  },
+                    type: geomType,
+                    geometry: geom,
+                    properties: Object.assign( baseProps, deltaProps),
                 };
+
               }),
             },
           },

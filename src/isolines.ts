@@ -167,6 +167,13 @@ function ratio(a: number, b: number, c: number) {
   return (b - a) / (c - a);
 }
 
+export type IsoOptions = {
+    levels?: number [],
+    interval? : number,
+    deltaReference? : number,
+    polygons? : boolean,
+}
+
 /**
  * Generates contour lines from a HeightTile
  *
@@ -178,16 +185,16 @@ function ratio(a: number, b: number, c: number) {
  * contour lines in tile coordinates
  */
 export default function generateIsolines(
-  interval: number,
+  isoOptions: IsoOptions,
   tile: HeightTile,
   extent: number = 4096,
   buffer: number = 1,
   gpwslevels?: number[],
   x?, y?, z?
 ): { [ele: number]: number[][] } {
-  if (!interval) {
-    return {};
-  }
+  // if (!interval) {
+  //   return {};
+  // }
   const multiplier = extent / (tile.width - 1);
   let tld: number, trd: number, bld: number, brd: number;
   let r: number, c: number;
@@ -198,11 +205,18 @@ export default function generateIsolines(
   
 
   //ISOPOLYS: need this to identify edges
+
+  const dbg=(1==1)
+  
+
   const minXY = multiplier * (0 - 1);
   const maxXY = 4096 + Math.abs(minXY);
   const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y);
   fullTile.minXY = minXY;
   fullTile.maxXY = maxXY;
+
+  if(dbg) console.log(`genIsolines: ${z}/${y}/${x} `)
+  
 
   function interpolate(
     point: [number, number],
@@ -230,6 +244,22 @@ export default function generateIsolines(
     }
   }
 
+  function createLevelsSet( min, max, levelSet ){
+      return levelSet.filter( l=> l >= min && l <= max);
+  }
+
+  function createLevelsInterval( min, max, interval, filterCb? : Function ){
+      const start = Math.ceil(min / interval) * interval;
+      const end = Math.floor(max / interval) * interval;
+
+      const _levels  : number[]= [];            
+      for ( let threshold = start; threshold <= end; threshold += interval ){
+          if( filterCb && !filterCb(threshold) ) continue;
+          _levels.push( threshold )
+      }
+      return _levels;
+  }
+
   // Most marching-squares implementations (d3-contour, gdal-contour) make one pass through the matrix per threshold.
   // This implementation makes a single pass through the matrix, building up all of the contour lines at the
   // same time to improve performance.
@@ -255,8 +285,8 @@ export default function generateIsolines(
 
       const min = Math.min(minL, minR);
       const max = Math.max(maxL, maxR);
-      const start = Math.ceil(min / interval) * interval;
-      const end = Math.floor(max / interval) * interval;
+      // const start = Math.ceil(min / interval) * interval;
+      // const end = Math.floor(max / interval) * interval;
 
       //ISOPOLY: set tile ma x and min elevation
       const maxElev = Math.max(tld, trd, bld, brd)
@@ -266,9 +296,25 @@ export default function generateIsolines(
       //fullTile.setMin(minElev)
       //convertTileIsolinesToPolygonsfullTile.setMin(minElev)
 
-      for (let threshold = start; threshold <= end; threshold += interval) {
+      let isoLevels : number[] | undefined = undefined;
+      if ( isoOptions.levels) {
+          isoLevels =  createLevelsSet(min,max,isoOptions.levels)
+      } else if ( isoOptions.interval) {
+          const interval = isoOptions.interval;
+          isoLevels =  createLevelsInterval(min,max,interval)
+      } else {
+          throw new Error("no levels, interval set");
+      }
 
-        if ( lowCutout != undefined && threshold < lowCutout ) continue;
+      if(!isoLevels) throw new Error("levels is undefined")
+
+      //const levelStart = ( lowCutout!= undefined) ? Math.max(start,lowCutout) : start;
+      //const isoLevels = createLevels( start ,end, isoOptions )
+      //console.log("isoLevels",isoLevels)
+
+      for (let threshold of isoLevels) {
+
+        // if ( lowCutout != undefined && threshold < lowCutout ) continue;
 
         const tl = tld > threshold;
         const tr = trd > threshold;
@@ -346,13 +392,13 @@ export default function generateIsolines(
     }
   }
 
+  if(dbg) console.log(`create isopolys:`, fullTile.toString())
 
   // ISOPOLY: convert lines to polygons
   if (gpwslevels) {
-    const dbg=(1==1)
-    if(dbg) console.log(`create tile isopolys:`, fullTile.toString())
+    
 
-    if(dbg) console.log("- segements:", segments)
+    // if(dbg) console.log("- segements:", segments)
 
     try {
       const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
