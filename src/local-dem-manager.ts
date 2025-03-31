@@ -257,13 +257,18 @@ export class LocalDemManager implements DemManager {
 
         const geomType = (isoOptions.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
 
+        // natural ordering will messe up ordering if negative levels are involved
+        const isoLinesKeysSorted = Object.keys(isolines).map( a => Number(a)).sort( (a,b) => a-b);
+
         mark?.();
         const result = encodeVectorTile({
           extent,
           layers: {
             [contourLayer]: {
-              features: Object.entries(isolines).map(([eleString, geom]) => {
-                const ele = Number(eleString);
+
+              //features: Object.entries(isolines).map(([eleString, geom]) => {
+              features: isoLinesKeysSorted.map( l => { return {ele : l , geom: isolines[l] }} ).map(({ele, geom}) => {
+                // const ele = Number(eleString);
 
                 const baseProps = { 
                     [elevationKey]: ele, 
