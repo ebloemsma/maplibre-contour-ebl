@@ -1104,6 +1104,7 @@
             try {
                 const isoPolygonsMap = {};
 
+                
                 for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
                     //console.log(`${key}: ${value}`);
                 
@@ -3348,6 +3349,7 @@
                 //     deltaReference: 0,
                 // }
 
+                console.log("levelDef:",isoOptions.levelDef)
                 const geomType = (isoOptions.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
 
                 const isolines = generateIsolines( isoOptions, virtualTile, extent, buffer, x, y, z);
@@ -3376,12 +3378,18 @@
                                     delta: deltaAlt,
                                 }:{}
 
-                            
+
+
+                                const levelDef = isoOptions.levelDef?.find( e => Number(e.level)==ele )
+                                const levelProps = (levelDef)?levelDef.props:{}
+
+                                const properties = Object.assign( baseProps, deltaProps,levelProps)
+                                //console.log(properties)
 
                                 return {
                                     type: geomType,
                                     geometry: geom,
-                                    properties: Object.assign( baseProps, deltaProps),
+                                    properties,
                                 };
                             }),
                         },
