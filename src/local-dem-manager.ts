@@ -165,12 +165,13 @@ export class LocalDemManager implements DemManager {
   ): Promise<ContourTile> {
     const {
       levels,
+      intervals,
       multiplier = 1,
       buffer = 1,
       extent = 4096,
       contourLayer = "contours",
       elevationKey = "ele",
-      levelKey = "level",
+      intervalKey = "intervalIndex",
       subsampleBelow = 100,
     } = options;
 
@@ -178,9 +179,10 @@ export class LocalDemManager implements DemManager {
     
 
     // no levels means less than min zoom with levels specified
-    if (!levels || levels.length === 0) {
+    if ( (!intervals || intervals.length === 0) && (! levels || levels.length === 0) ) {
       return Promise.resolve({ arrayBuffer: new ArrayBuffer(0) });
     }
+
     const key = [z, x, y, encodeIndividualOptions(options)].join("/");
     return this.contourCache.get(
       key,
@@ -257,7 +259,7 @@ export class LocalDemManager implements DemManager {
 
                 const baseProps = { 
                     [elevationKey]: ele, 
-                    [levelKey]: Math.max(...levels.map((l, i) => (ele % l === 0 ? i : 0))) 
+                    [intervalKey]: (intervals)?Math.max(...intervals.map((l, i) => (ele % l === 0 ? i : 0))) : 0,
                 }
 
                 //ISOPOLYS: calc delta value and extend props

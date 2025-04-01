@@ -200,16 +200,15 @@ export default function generateIsolines(
 
   //ISOPOLYS: need this to identify edges
 
-  const dbg=(1==1)
+  const dbg:string=`${0}`;
   
-
   const minXY = multiplier * (0 - 1);
   const maxXY = 4096 + Math.abs(minXY);
   const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y);
   fullTile.minXY = minXY;
   fullTile.maxXY = maxXY;
 
-  if(dbg) console.log(`genIsolines: ${z}/${y}/${x} `)
+  if(dbg=="1") console.log(`genIsolines: ${z}/${y}/${x} `)
   
 
   function interpolate(
@@ -291,14 +290,17 @@ export default function generateIsolines(
       let isoLevels : number[] | undefined = undefined;
       if ( isoOptions.levels) {
           isoLevels =  createLevelsSet(min,max,isoOptions.levels)
-      } else if ( isoOptions.interval) {
-          const interval = isoOptions.interval;
-          isoLevels =  createLevelsInterval(min,max,interval)
+      } else if ( isoOptions.intervals) {
+          const intervals= isoOptions.intervals;
+          isoLevels =  createLevelsInterval(min,max,intervals[0])
       } else {
           throw new Error("no levels, interval set");
       }
 
       if(!isoLevels) throw new Error("levels is undefined")
+
+      if(isoOptions.min!=null) isoLevels = isoLevels.filter( l => l >= (isoOptions.min ?? -Infinity) )
+      
 
       //const levelStart = ( lowCutout!= undefined) ? Math.max(start,lowCutout) : start;
       //const isoLevels = createLevels( start ,end, isoOptions )
@@ -389,7 +391,7 @@ export default function generateIsolines(
   // ISOPOLY: convert lines to polygons
   if ( isoOptions.polygons ) {
     
-    if(dbg) console.log(`create isopolys:`, fullTile.toString())
+    if(dbg=="1")  console.log(`create isopolys:`, fullTile.toString())
 
     try {
       const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
@@ -399,19 +401,19 @@ export default function generateIsolines(
         const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, elevationIsoLines, fullTile);
         if(polys.length>0) isoPolygonsMap[elevationLevel] = polys;
       }
-      if(dbg) console.log("isoPolygonsMap",isoPolygonsMap );
+      if(dbg=="1")  console.log("isoPolygonsMap",isoPolygonsMap );
 
       // generate full tile polys
       const levels = isoOptions.levels;
       const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z)
       if (Object.keys(fullTilePolys).length) {
         // console.log("fullTilePolys",fullTilePolys );
-        if(dbg) console.log(`- fullTilePolys`, fullTilePolys)
+        if(dbg=="1")  console.log(`- fullTilePolys`, fullTilePolys)
       }
       const mergedPolys = mergeElevationMaps(isoPolygonsMap, fullTilePolys)
 
 
-      if(dbg) console.log("- mergedPolys:",mergedPolys);
+      if(dbg=="1")  console.log("- mergedPolys:",mergedPolys);
       return mergedPolys;
 
     } catch (e) {

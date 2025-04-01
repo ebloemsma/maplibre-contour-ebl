@@ -47,8 +47,8 @@ export interface ContourTileOptions {
   overzoom?: number;
   /** Key for the elevation property to set on each contour line. */
   elevationKey?: string;
-  /** Key for the "level" property to set on each contour line. Minor lines have level=0, major have level=1 */
-  levelKey?: string;
+  /** Key for the "interval" property to set on each contour line. Minor lines have key=0, major have key=1 */
+  intervalKey?: string;
   /** Name of the vector tile layer to put contour lines in */
   contourLayer?: string;
   /** Grid size of the vector tile (default 4096) */
@@ -58,12 +58,7 @@ export interface ContourTileOptions {
   /** When overzooming tiles, subsample to scale up to at least this size to make the contour lines smoother at higher zooms. */
   subsampleBelow?: number;
 
-  gpwsConfig?: GPWSConfig; 
-}
-
-export type GPWSConfig = {
-  referenceAltitude: number;
-  levels : [ number ]
+  intervals?: number [];
 }
 
 export interface GlobalContourTileOptions extends ContourTileOptions {
@@ -80,12 +75,13 @@ export interface GlobalContourTileOptions extends ContourTileOptions {
 }
 
 export interface IsolineOptions  {
+  intervals?: number [];
+  min? : number;
   levels?: number [],
   levelDef?: [{
     level: number,
     props: Record<string,any>
   }]
-  interval? : number,
   deltaReference? : number,
   polygons? : boolean,
 }

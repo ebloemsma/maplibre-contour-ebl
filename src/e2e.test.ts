@@ -138,7 +138,7 @@ test("e2e contour tile", async () => {
             buffer: 0,
             contourLayer: "c",
             elevationKey: "e",
-            levelKey: "l",
+            intervalKey: "l",
             overzoom: 0,
           })
           .replace("{z}", "10")

@@ -22,7 +22,7 @@ const fullGlobalOptions: GlobalContourTileOptions = {
   elevationKey: "elevation key",
   extent: 123,
   buffer: 1,
-  levelKey: "level key",
+  intervalKey: "level key",
   multiplier: 123,
   overzoom: 3,
 };
@@ -93,7 +93,7 @@ test("encode individual options", () => {
     contourLayer: "contour layer",
     elevationKey: "elevation key",
     extent: 123,
-    levelKey: "level key",
+    intervalKey: "level key",
     multiplier: 123,
     overzoom: 3,
   };
