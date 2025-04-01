@@ -7,6 +7,7 @@
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
   <script src="../dist/index.js"></script>
+  <script src="../demo_gpws/gpws.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     body {
@@ -23,85 +24,85 @@
   </style>
   <style>
     .map-overlay {
-        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
-        position: absolute;
-        width: 200px;
-        top: 0;
-        left: 0;
-        padding: 10px;
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      position: absolute;
+      width: 200px;
+      top: 0;
+      left: 0;
+      padding: 10px;
     }
 
     .map-overlay .map-overlay-inner {
-        background-color: #fff;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        border-radius: 3px;
-        padding: 10px;
-        margin-bottom: 10px;
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      padding: 10px;
+      margin-bottom: 10px;
     }
 
     .map-overlay-inner fieldset {
-        border: none;
-        padding: 0;
-        margin: 0 0 10px;
+      border: none;
+      padding: 0;
+      margin: 0 0 10px;
     }
 
     .map-overlay-inner fieldset:last-child {
-        margin: 0;
+      margin: 0;
     }
 
     .map-overlay-inner select {
-        width: 100%;
+      width: 100%;
     }
 
     .map-overlay-inner label {
-        display: block;
-        font-weight: bold;
-        margin: 0 0 5px;
+      display: block;
+      font-weight: bold;
+      margin: 0 0 5px;
     }
 
     .map-overlay-inner button {
-        display: inline-block;
-        width: 36px;
-        height: 20px;
-        border: none;
-        cursor: pointer;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      border: none;
+      cursor: pointer;
     }
 
     .map-overlay-inner button:focus {
-        outline: none;
+      outline: none;
     }
 
     .map-overlay-inner button:hover {
-        box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.1);
+      box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.1);
     }
-</style>
+  </style>
 </head>
 
 <body>
   <div id="map" style="background-color: white;"></div>
   <div class="map-overlay top">
     <div class="map-overlay-inner">
-        <fieldset>
-            <label for="layer">Current Altitude:</label>
-            <select id="layer" name="layer" _onChange="selectLayer(e)">
-              <option value="17000">17000</option>
-              <option value="15000">15000</option>
-              <option value="13000">13000</option>
-              <option value="11000">11000</option>
-                <option value="8000">8000</option>
-                <option value="6000">6000</option>
-                <option value="4000" >4000</option>
-                <option value="3000">3000</option>
-                <option value="2500" selected>2500</option>
-                <option value="2000">2000</option>
-                <option value="1000">1000</option>
-                <option value="500">500</option>
-                <option value="0">0</option>
-            </select>
-        </fieldset>
-        
+      <fieldset>
+        <label for="layer">Current Altitude:</label>
+        <select id="layer" name="layer" _onChange="selectLayer(e)">
+          <option value="17000">17000</option>
+          <option value="15000">15000</option>
+          <option value="13000">13000</option>
+          <option value="11000">11000</option>
+          <option value="8000">8000</option>
+          <option value="6000">6000</option>
+          <option value="4000">4000</option>
+          <option value="3000">3000</option>
+          <option value="2500" selected>2500</option>
+          <option value="2000">2000</option>
+          <option value="1000">1000</option>
+          <option value="500">500</option>
+          <option value="0">0</option>
+        </select>
+      </fieldset>
+
     </div>
-</div>
+  </div>
   <script>
 
     const TILESERVER_AWS = "https://elevation-tiles-prod.s3.amazonaws.com/terrarium"
@@ -117,43 +118,31 @@
       minzoom: 4,
     });
 
-    
+
 
     // calls maplibregl.addProtocol for the shared cache and contour protocols
     demSource.setupMaplibre(maplibregl);
 
-    const gpwsLevelsCfg = [
-      2000,
-      1000,
-      -500,
-      -1000, 
-      -2000
-    ]
-
     let SelectedGPWSAltitude = 200;
-    demSource.GetOptions = ( tileCoords ) => {
-        
-        const levels = gpwsLevelsCfg.map( rl => rl + SelectedGPWSAltitude);
-        const config = {
-          levels, //[2500] ,//[ -300, 0,100, 400],
-          interval : 100, //levels[0]
-          polygons: true,
-          deltaReference: SelectedGPWSAltitude, //400,
-        }
+    demSource.GetOptions = (tileCoords) => {
 
-        // const gpwsCfg =  {
-        //   referenceAltitude: SelectedGPWSAltitude,
-        //   levels: gpwsLevelsCfg.map( rl => rl + SelectedGPWSAltitude),
-        // };
+      const gpwsLevels = createGpwsLevel(SelectedGPWSAltitude);
+      // console.log(gpwsLevels.map( e => e.level))
 
-        //console.log("##GetOptions",tileCoords, config)
-        return config;
+      const config = {
+        levels: gpwsLevels.map(e => e.level), //[ -300, 0,100, 400],
+        levelDef: gpwsLevels,
+        //intervals : [100], //levels[0]
+        polygons: true,
+        deltaReference: SelectedGPWSAltitude, //400,
+      }
+      return config;
     }
 
     var map = new maplibregl.Map({
       container: "map",
       zoom: 12.55,
-      center: [-122,47.92731],
+      center: [-122, 47.92731],
       hash: true,
       style: {
         showTileBoundaries: true,
@@ -174,17 +163,20 @@
                 // meters to feet
                 multiplier: 3.28084,
                 overzoom: 1,
-
+                min: -100,
                 thresholds: {
                   // zoom: [minor, major]
-                  3: [100, 500],
-                  
-                  15: [100, 100]
+                  3: [2000, 2000],
+                  5: [1000, 2000],
+                  10: [800, 2000],
+                  12: [400, 500],
+                  14: [200, 500]
                 },
                 elevationKey: 'ele',
                 levelKey: 'level',
                 contourLayer: 'contours',
-                
+                subsampleBelow: 10,
+
               })
             ],
             maxzoom: 15
@@ -218,9 +210,9 @@
             },
           },
 
-        
 
-        
+
+
 
           {
             id: 'contour-text',
@@ -249,26 +241,26 @@
           }
         ],
         terrain: {
-            source: 'dem',
-            exaggeration: 1
+          source: 'dem',
+          exaggeration: 1
         },
       },
     });
-  
-    
+
+
 
     map.on('load', async () => {
-    
+
 
     })
 
     const selectGPWS = document.getElementById('layer');
-    selectGPWS.addEventListener("change", function($e) {
-        SelectedGPWSAltitude = Number($e.target.value)
-        console.log("select GPWS Alt:", SelectedGPWSAltitude)
-        //force map-update
-        map.style.sourceCaches['contourSourceFeet'].clearTiles()
-        map.style.sourceCaches['contourSourceFeet'].update(map.transform)
+    selectGPWS.addEventListener("change", function ($e) {
+      SelectedGPWSAltitude = Number($e.target.value)
+      console.log("select GPWS Alt:", SelectedGPWSAltitude)
+      //force map-update
+      map.style.sourceCaches['contourSourceFeet'].clearTiles()
+      map.style.sourceCaches['contourSourceFeet'].update(map.transform)
 
     });
 
@@ -278,18 +270,18 @@
     //     map.addImage('pattern', image.data);
     // })
     map.on("click", e => {
-        console.log( e.lngLat)
-        
-        //const elev=map.queryTerrainElevation([e.lngLat.lng,e.lngLat.lat])
-        //console.log(elev)
+      console.log(e.lngLat)
 
-        const meter2Feet = 3.28084;        
-        const elevationMeters = map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
-        const elevationFeet = elevationMeters * meter2Feet
+      //const elev=map.queryTerrainElevation([e.lngLat.lng,e.lngLat.lat])
+      //console.log(elev)
 
-        const zoom = map.getZoom()
+      const meter2Feet = 3.28084;
+      const elevationMeters = map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
+      const elevationFeet = elevationMeters * meter2Feet
 
-        console.log( zoom,elevationFeet )
+      const zoom = map.getZoom()
+
+      console.log(zoom, elevationFeet)
     })
     map.showTileBoundaries = true;
 
