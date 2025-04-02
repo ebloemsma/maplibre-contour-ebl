@@ -138,7 +138,11 @@ export class LocalDemManager implements DemManager {
     abortController: AbortController,
     timer?: Timer,
   ): Promise<HeightTile> {
-    const zoom = Math.min(z - (options.overzoom || 0), this.maxzoom);
+    
+    //const zoom = Math.min(z - (options.overzoom || 0), this.maxzoom);
+    const maxFetchZoom = options.maxFetchZoom || 22;
+    const zoom = Math.min( Math.min(z - (options.overzoom || 0), this.maxzoom) , maxFetchZoom) ;
+
     const subZ = z - zoom;
     const div = 1 << subZ;
     const newX = Math.floor(x / div);

@@ -45,6 +45,12 @@ export interface ContourTileOptions {
    * 512x512 or larger `raster-dem` tiles.
    */
   overzoom?: number;
+
+  /**
+   * limits up to which zoom tiles will be fetched. beyond this overzooming is used with lower resolution
+   */
+  maxFetchZoom?: number;
+
   /** Key for the elevation property to set on each contour line. */
   elevationKey?: string;
   /** Key for the "interval" property to set on each contour line. Minor lines have key=0, major have key=1 */
