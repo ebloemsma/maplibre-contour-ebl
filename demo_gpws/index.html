@@ -6,8 +6,10 @@
   <title>Display a map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
-  <script src="../dist/index.js"></script>
+  <!--<script src="../_dist/index.js"></script>-->
   <script src="../demo_gpws/gpws.js"></script>
+  <script src="./indexpatch.js"></script>
+
   <link href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     body {
@@ -83,7 +85,7 @@
   <div class="map-overlay top">
     <div class="map-overlay-inner">
       <fieldset>
-        <label for="layer">Current Altitude:</label>
+        <label for="layer">Current Altitude: [<span id="setAlt"></span>]</label>
         <select id="layer" name="layer" _onChange="selectLayer(e)">
           <option value="17000">17000</option>
           <option value="15000">15000</option>
@@ -102,6 +104,10 @@
         </select>
       </fieldset>
 
+      <div class="slidecontainer">
+        <input type="range" min="0" max="6000" value="50" class="slider" id="altSlider" style="width: 300px">
+      </div>
+
     </div>
   </div>
   <script>
@@ -115,8 +121,10 @@
       url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
       //url: "http://localhost:8080/services/seattle-mz/tiles/{z}/{x}/{y}.png", 
       encoding: "terrarium",
-      maxzoom: 15,
-      minzoom: 4,
+      maxzoom: 10,
+      minzoom: 10,
+
+      
     });
 
 
@@ -128,7 +136,7 @@
 
 
 
-    let SelectedGPWSAltitude = 200;
+    let SelectedGPWSAltitude = 1606;
 
 
 
@@ -136,10 +144,10 @@
     demSource.GetOptions = (tileCoords) => {
 
       const gpwsLevels = createGpwsLevel(SelectedGPWSAltitude);
-      // console.log(gpwsLevels.map( e => e.level))
+      console.log("createGpwsLevel", gpwsLevels.map(e => [e.level, e.props.gpwsPattern]))
 
       const config = {
-        levels: [1200] ,// gpwsLevels.map(e => e.level), //[ -300, 0,100, 400],
+        levels: gpwsLevels.map(e => e.level), //[ -300, 0,100, 400],
         levelDef: gpwsLevels,
         //intervals : [100], //levels[0]
         polygons: true,
@@ -159,13 +167,13 @@
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
-          dem: {
-            type: "raster-dem",
-            encoding: "terrarium",
-            tiles: [demSource.sharedDemProtocolUrl], // share cached DEM tiles with contour layer
-            maxzoom: 15,
-            tileSize: 256,
-          },
+          // dem: {
+          //   type: "raster-dem",
+          //   encoding: "terrarium",
+          //   tiles: [demSource.sharedDemProtocolUrl], // share cached DEM tiles with contour layer
+          //   maxzoom: 15,
+          //   tileSize: 256,
+          // },
           contourSourceFeet: {
             type: 'vector',
             tiles: [
@@ -173,12 +181,11 @@
                 // meters to feet
                 multiplier: 3.28084,
                 overzoom: 1,
-
+                maxFetchZoom: 6,
                 thresholds: {
                   // zoom: [minor, major]
-                  3: [100, 100],
-
-                  13: [100, 100]
+                  // 3: [100, 100],
+                  // 13: [100, 100]
                 },
                 elevationKey: 'ele',
                 intervalKey: 'level',
@@ -186,22 +193,23 @@
 
               })
             ],
-            maxzoom: 15
+            maxzoom: 13,
+            minzoom: 4
           }
         },
 
         layers: [
-          {
-            id: "hills",
-            type: "hillshade",
-            source: "dem",
-            paint: {
-              "hillshade-exaggeration": 0.25,
-            },
-            layout: {
-              visibility: "none",
-            }
-          },
+          // {
+          //   id: "hills",
+          //   type: "hillshade",
+          //   source: "dem",
+          //   paint: {
+          //     "hillshade-exaggeration": 0.25,
+          //   },
+          //   layout: {
+          //     visibility: "none",
+          //   }
+          // },
           {
             id: "contours",
             type: "line",
@@ -276,10 +284,10 @@
             }
           }
         ],
-        terrain: {
-          source: 'dem',
-          exaggeration: 1
-        },
+        // terrain: {
+        //   source: 'dem',
+        //   exaggeration: 1
+        // },
       },
     });
 
@@ -304,14 +312,21 @@
     })
 
     const selectGPWS = document.getElementById('layer');
+
+    const setAltElement = document.getElementById('setAlt');
+
     selectGPWS.addEventListener("change", function ($e) {
-      SelectedGPWSAltitude = Number($e.target.value)
+      setGPWS(Number($e.target.value))
+    })
+
+    function setGPWS( alt ){
+      SelectedGPWSAltitude = alt
       console.log("select GPWS Alt:", SelectedGPWSAltitude)
+      setAltElement.innerHTML = alt
       //force map-update
       map.style.sourceCaches['contourSourceFeet'].clearTiles()
       map.style.sourceCaches['contourSourceFeet'].update(map.transform)
-
-    });
+    };
 
     // map.on('load', async () => {
     //     const image = await map.loadImage('pattern.png');
@@ -325,14 +340,26 @@
       //console.log(elev)
 
       const meter2Feet = 3.28084;
-      const elevationMeters = map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
+      const elevationMeters = null;//map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
       const elevationFeet = elevationMeters * meter2Feet
 
       const zoom = map.getZoom()
 
-      console.log(zoom, elevationFeet)
+      console.log({ zoom, elevationFeet })
     })
     map.showTileBoundaries = true;
+
+    var rangeInput = document.getElementById("altSlider");
+    
+    if (rangeInput.addEventListener) {
+      rangeInput.addEventListener('change', altRange);
+    }
+
+    function altRange($e) {
+      var value = Number($e.target.value)
+      
+      setGPWS(value)
+    }
 
   </script>
 </body>
