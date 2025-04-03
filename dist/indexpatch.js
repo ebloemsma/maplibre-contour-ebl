@@ -117,14 +117,82 @@
         // }
         return fullTilePolygons;
     }
+    function analyzePolygon(coords) {
+        if (coords.length < 6) {
+            throw new Error("A polygon must have at least 3 points (6 coordinates).");
+        }
+        if (coords.length % 2 !== 0) {
+            throw new Error("Coordinate list must have an even number of values (x, y pairs).");
+        }
+        // Check if the polygon is closed
+        const firstX = coords[0];
+        const firstY = coords[1];
+        const lastX = coords[coords.length - 2];
+        const lastY = coords[coords.length - 1];
+        if (firstX !== lastX || firstY !== lastY) {
+            throw new Error("Polygon must be closed (first and last points must match).");
+        }
+        // https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+        let area = 0;
+        let perimeter = 0;
+        const numPoints = coords.length / 2;
+        for (let i = 0; i < numPoints; i++) {
+            const x1 = coords[2 * i];
+            const y1 = coords[2 * i + 1];
+            const x2 = coords[(2 * ((i + 1) % numPoints))];
+            const y2 = coords[(2 * ((i + 1) % numPoints)) + 1];
+            // Shoelace formula component
+            area += (x1 * y2 - x2 * y1);
+            // Distance between consecutive points
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            perimeter += Math.hypot(dx, dy);
+        }
+        const signedArea = area / 2;
+        const absoluteArea = Math.abs(signedArea);
+        const winding = signedArea < 0 ? 'ccw' : 'cw';
+        //const isTiny = absoluteArea < 50*50;
+        // let min = Infinity;
+        // let max = -Infinity;
+        // iteratePointsInsidePolygon(coords, (x, y) => {
+        //     const elev = tile.get(x,y)
+        //     min = Math.min(min, elev)
+        //     max = Math.max(max, elev)
+        // })
+        return {
+            //isTiny,
+            signedArea,
+            area: absoluteArea,
+            length: perimeter,
+            winding
+        };
+    }
     class TiledLine {
         constructor(line, minXY, maxXY) {
+            this.toString = () => {
+                var _a;
+                const l = this;
+                if (l.isClosed) {
+                    return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
+                }
+                return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
+            };
             this.done = false;
             if (line) {
                 this.line = [...line],
                     this.update(minXY, maxXY);
                 this.minXY = minXY;
                 this.maxXY = maxXY;
+            }
+            // cw : inner lower
+            // ccw: inner is higher
+            if (this.isClosed) {
+                const polyInfo = analyzePolygon(this.line);
+                this.info = polyInfo;
+                //this.isTiny = polyInfo.isTiny
+                this.length = polyInfo.length;
+                this.winding = polyInfo.winding;
+                this.area = polyInfo.area;
             }
         }
         update(minXY, maxXY) {
@@ -142,6 +210,9 @@
         }
         get hash() {
             return hashArray(this.line);
+        }
+        get isTiny() {
+            return (this.area != undefined) ? this.area < 50 * 50 : null;
         }
         get isClosed() {
             if (!this.line)
@@ -408,6 +479,9 @@
                 all: [],
             };
             const toString = (l) => {
+                if (l.isClosed) {
+                    return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
+                }
                 let closable = (this.lineIsClosable(l)) ? "closable" : "";
                 return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y} ${closable}]`;
             };
@@ -419,6 +493,9 @@
             }
             for (const line of this.lineIndexFlatList(lineIndex)) {
                 debug.all.push(toString(line));
+            }
+            for (const line of this.inner) {
+                debug.inner.push(toString(line));
             }
             return debug;
         }
@@ -657,6 +734,10 @@
         }
         checkAndClosableLine(line, minXY, maxXY) {
             throw new Error("Disabled checkAndClosableLine");
+        }
+        toArrayAllInner(lineFilter) {
+            const useFilter = (lineFilter) ? lineFilter : () => true;
+            return [...this.all.filter(useFilter).map(tl => tl.line), ...this.inner.filter(useFilter).map(tl => tl.line),];
         }
     } // class LineINdex
     /**
