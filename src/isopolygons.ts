@@ -1,21 +1,35 @@
-export class TileInformation  {
-    max?: number ;
-    min?: number ;
+import { classifyRings } from "@mapbox/vector-tile";
+import type { HeightTile } from "./height-tile";
+
+export class TileInformation {
+    setTile(tile: HeightTile) {
+
+        const { edgeMin, edgeMax } = findTileEdgeMinMax(tile)
+        this.edgeMin = Math.round(edgeMin)
+        this.edgeMax = Math.round(edgeMax)
+    }
+
+    edgeMax?: number;
+    edgeMin?: number;
+
+    max?: number;
+    min?: number;
     x?: number;
     y?: number;
     z?: number;
     minXY?: number;
     maxXY?: number;
     minElev?: number;
-    maxElev?:number;
-    constructor(z,x,y){
-        this.z=z;
-        this.y=y;
-        this.x=x;
+    maxElev?: number;
+    constructor(z, x, y, tile?) {
+        this.z = z;
+        this.y = y;
+        this.x = x;
+        if (tile) this.setTile(tile)
     }
 
-    toString(){
-        return `TileInfo: z,x,y: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  min/maxXY: ${this.minXY},${this.maxXY} ` 
+    toString() {
+        return `TileInfo: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  edgemin/max: ${this.edgeMin}/${this.edgeMax}` //min/maxXY: ${this.minXY},${this.maxXY} `
     }
 }
 
@@ -37,8 +51,75 @@ type EdgeLineIndex = {
 
 type EdgeId = 1 | 2 | 4 | 8;
 
-type TileEdgeLineIndex = Record<EdgeId, EdgeLineIndex>
+class TileEdgeLineIndex {
+    1: EdgeLineIndex;
+    2: EdgeLineIndex;
+    4: EdgeLineIndex;
+    8: EdgeLineIndex;
 
+    static createFromLines(lines, minXY, maxXY) {
+        const lineObjects = lines.map(l => {
+            return new TiledLine(l, minXY, maxXY);
+        });
+        return TileEdgeLineIndex.createFromTileLines(lineObjects, minXY, maxXY)
+    }
+    static createFromTileLines(lineObjectsAll, minXY, maxXY) {
+        // const lineObjects = lines.map(l => {
+        //     return new TiledLine(l, minXY, maxXY);
+        // });
+        // console.log( inner )
+
+        const lineObjects = lineObjectsAll.filter(l => (!l.isClosed && !l.isTiny))
+
+        const topStart = lineObjects.filter(lo => lo.brd.start == 1).sort((a, b) => {
+            return (a.start.x - b.start.x);
+        });
+        const rightStart = lineObjects.filter(lo => lo.brd.start == 2).sort((a, b) => {
+            return (a.start.y - b.start.y);
+        });
+        // x von groß zu klein
+        const bottomStart = lineObjects.filter(lo => lo.brd.start == 4).sort((a, b) => {
+            return (b.start.x - a.start.x);
+        });
+        //von oben nach unten
+        const leftStart = lineObjects.filter(lo => lo.brd.start == 8).sort((a, b) => {
+            return (b.start.y - a.start.y);
+        });
+        //------
+        const topEnd = lineObjects.filter(lo => lo.brd.end == 1).sort((a, b) => {
+            return (a.end.x - b.end.x);
+        });
+        const rightEnd = lineObjects.filter(lo => lo.brd.end == 2).sort((a, b) => {
+            return (a.end.y - b.end.y);
+        });
+        // x von groß zu klein
+        const bottomEnd = lineObjects.filter(lo => lo.brd.end == 4).sort((a, b) => {
+            return (b.end.x - a.end.x);
+        });
+        //von oben nach unten
+        const leftEnd = lineObjects.filter(lo => lo.brd.end == 8).sort((a, b) => {
+            return (b.end.y - a.end.y);
+        });
+        return {
+            1: {
+                s: topStart,
+                e: topEnd,
+            },
+            2: {
+                s: rightStart,
+                e: rightEnd,
+            },
+            4: {
+                s: bottomStart,
+                e: bottomEnd,
+            },
+            8: {
+                s: leftStart,
+                e: leftEnd,
+            }
+        } as TileEdgeLineIndex;
+    }
+}
 
 function findBorder(x, y, minXY, maxXY) {
     let left = x == minXY;
@@ -49,11 +130,11 @@ function findBorder(x, y, minXY, maxXY) {
     let code = (top ? 1 : 0 | (right ? 2 : 0) | (bottom ? 4 : 0) | (left ? 8 : 0));
 
     // hack to fix corner points
-    if ( code == 6) code = 2;
-    if ( code == 12) code = 4;
-    if ( code == 3) code = 1;
-    if ( code == 9) code = 8;
-    
+    if (code == 6) code = 2;
+    if (code == 12) code = 4;
+    if (code == 3) code = 1;
+    if (code == 9) code = 8;
+
 
     return code;
 }
@@ -89,7 +170,7 @@ function getLineFirst(line) {
 
 function getLineBorderCode(line: LineDefinition, minXY, maxXY) {
 
-    if(!line) throw new Error("empty line")
+    if (!line) throw new Error("empty line")
 
     const l = line.length;
     let sx = line[0];
@@ -107,13 +188,13 @@ function getLineBorderCode(line: LineDefinition, minXY, maxXY) {
 
 
 export function generateFullTileIsoPolygons(fullTile: TileInformation, levels, minXY, maxXY, x, y, z) {
-    
+
     // console.log("ADD FULL:",fullTile,gpwslevels)
 
-    
-    if( fullTile.min == undefined) return [];
 
-    const fullTilePolygons : ElevationLinesMap = {};
+    if (fullTile.min == undefined) return [];
+
+    const fullTilePolygons: ElevationLinesMap = {};
 
     for (const lvl of levels) {
 
@@ -133,37 +214,133 @@ export function generateFullTileIsoPolygons(fullTile: TileInformation, levels, m
     return fullTilePolygons;
 }
 
-type LineDefinition = number [];
+export function findTileEdgeMinMax(tile) {
+
+    let edgeMin = -Infinity;
+    let edgeMax = Infinity
+
+    for (let col = 0; col < tile.width; col++) {
+        const top = tile.get(0, col);
+        const botom = tile.get(tile.height - 1, col);
+        edgeMin = Math.max(edgeMin, top, botom)
+        edgeMax = Math.min(edgeMax, top, botom)
+    }
+
+    for (let row = 0; row < tile.height; row++) {
+        const left = tile.get(row, 0);
+        const right = tile.get(row, tile.width - 1);
+        edgeMin = Math.max(edgeMin, left, right)
+        edgeMax = Math.min(edgeMax, left, right)
+    }
+    return { edgeMin, edgeMax }
+}
+
+type PolygonInfo = {
+    length?: number;
+    winding?: "cw" | "ccw";
+    area?: number;
+
+}
+
+export function analyzePolygon(coords) {
+    if (coords.length < 6) {
+        throw new Error("A polygon must have at least 3 points (6 coordinates).");
+    }
+    if (coords.length % 2 !== 0) {
+        throw new Error("Coordinate list must have an even number of values (x, y pairs).");
+    }
+
+    // Check if the polygon is closed
+    const firstX = coords[0];
+    const firstY = coords[1];
+    const lastX = coords[coords.length - 2];
+    const lastY = coords[coords.length - 1];
+
+    if (firstX !== lastX || firstY !== lastY) {
+        throw new Error("Polygon must be closed (first and last points must match).");
+    }
+
+    // https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+
+    let area = 0;
+    let perimeter = 0;
+    const numPoints = coords.length / 2;
+
+    for (let i = 0; i < numPoints; i++) {
+        const x1 = coords[2 * i];
+        const y1 = coords[2 * i + 1];
+        const x2 = coords[(2 * ((i + 1) % numPoints))];
+        const y2 = coords[(2 * ((i + 1) % numPoints)) + 1];
+
+        // Shoelace formula component
+        area += (x1 * y2 - x2 * y1);
+
+        // Distance between consecutive points
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        perimeter += Math.hypot(dx, dy);
+    }
+
+    const signedArea = area / 2;
+    const absoluteArea = Math.abs(signedArea);
+    const winding = signedArea < 0 ? 'ccw' : 'cw';
+
+    //const isTiny = absoluteArea < 50*50;
+    // let min = Infinity;
+    // let max = -Infinity;
+    // iteratePointsInsidePolygon(coords, (x, y) => {
+    //     const elev = tile.get(x,y)
+    //     min = Math.min(min, elev)
+    //     max = Math.max(max, elev)
+    // })
+
+    return {
+        //isTiny,
+        signedArea,
+        area: absoluteArea,
+        length: perimeter,
+        winding
+    } as PolygonInfo;
+}
+
+type LineDefinition = number[];
 
 type LineArray = LineDefinition[];
 
 type Elevation = number;
 
 // holds lines[] indexed at elevation
-export type ElevationLinesMap = Record<Elevation,LineArray>
+export type ElevationLinesMap = Record<Elevation, LineArray>
 
 class TiledLine {
 
     done: boolean;
-    line?: LineDefinition ;
-    minXY?: number ;
-    maxXY?: number ;
+    line?: LineDefinition;
+    minXY?: number;
+    maxXY?: number;
     start: any;
     end: any;
     brd: any;
+
+    length?: number;
+    winding?: "cw" | "ccw";
+    area?: number;
+    info?: any;
 
     constructor(line, minXY, maxXY) {
         this.done = false
         if (line) {
             this.line = [...line],
-            this.update(minXY, maxXY)
+                this.update(minXY, maxXY)
             this.minXY = minXY;
             this.maxXY = maxXY;
         }
+
+
     }
 
     update(minXY, maxXY) {
-        if(!this.line) throw new Error("empty this.line")
+        if (!this.line) throw new Error("empty this.line")
 
         const l = this.line
 
@@ -171,6 +348,18 @@ class TiledLine {
         this.start = getLineFirst(l)
         this.end = getLineLast(l)
         this.brd = border
+
+        // cw : inner lower
+        // ccw: inner is higher
+
+        if (this.isClosed) {
+            const polyInfo = analyzePolygon(this.line)
+            this.info = polyInfo;
+            //this.isTiny = polyInfo.isTiny
+            this.length = polyInfo.length
+            this.winding = polyInfo.winding
+            this.area = polyInfo.area
+        }
     }
 
     clone() {
@@ -182,8 +371,12 @@ class TiledLine {
         return hashArray(this.line);
     }
 
+    get isTiny() {
+        return (this.area != undefined) ? this.area < 50 * 50 : null;
+    }
+
     get isClosed() {
-        if(!this.line) throw new Error("empty this.line")
+        if (!this.line) throw new Error("empty this.line")
 
         const sx = this.line[0]
         const sy = this.line[1]
@@ -209,7 +402,7 @@ class TiledLine {
     }
 
     appendLine(appendLine, minXY, maxXY) {
-        if(!this.line) throw new Error("empty this.line")
+        if (!this.line) throw new Error("empty this.line")
 
         this.line.push(...appendLine.line)
         this.update(minXY, maxXY)
@@ -219,8 +412,8 @@ class TiledLine {
      * corners must be in counter Clockwise sorting
      * 
      */
-    appendCornersAtEnd(corners: number [], minXY, maxXY) {
-        if(!this.line) throw new Error("empty this.line")
+    appendCornersAtEnd(corners: number[], minXY, maxXY) {
+        if (!this.line) throw new Error("empty this.line")
 
         this.line.push(...corners)
 
@@ -229,30 +422,45 @@ class TiledLine {
     }
 
     closeLineStartEnd(minXY, maxXY) {
-        if(!this.line) throw new Error("empty this.line")
+        if (!this.line) throw new Error("empty this.line")
 
         this.line.push(this.line[0])
         this.line.push(this.line[1])
         this.update(minXY, maxXY)
     }
+
+    toString() {
+        const l = this;
+        if (l.isClosed) {
+            return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `
+        }
+
+        return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${l.line?.length} `;
+    };
 } // class TileLine
 
-const EDGES : EdgeId [] = [1, 2, 4, 8]
+const EDGES: EdgeId[] = [1, 2, 4, 8]
 
-class LineIndex {
+
+
+export class LineIndex {
     lineIndex: TileEdgeLineIndex;
     origIndex: TileEdgeLineIndex;
     finalPool: TiledLine[] = [];
+    filtered: TiledLine[] = [];
     inner: TiledLine[] = [];
 
     constructor(lines, minXY, maxXY) {
-        this.lineIndex = this.createLineIndex(lines, minXY, maxXY);
-        this.origIndex = this.createLineIndex(lines, minXY, maxXY);
+        this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
+        this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
         this.finalPool = [];
 
         const lineObjects = lines.map(l => {
-            return new TiledLine(l, minXY, maxXY)
-        })
+            return new TiledLine(l, minXY, maxXY);
+        });
+
+
+        this.filtered = lineObjects.filter(l => (!l.isClosed && !l.isTiny))
         this.inner = lineObjects.filter(lo => lo.brd.start == 0 || lo.brd.end == 0);
     }
 
@@ -260,9 +468,9 @@ class LineIndex {
         const edges = Object.keys(this.lineIndex)
         for (let c of edges) {
             let lines = this.lineIndex[c];
-            
+
             //let lines = this.get(c);
-            if ( !lines || !lines.s ) continue;
+            if (!lines || !lines.s) continue;
             let line = lines.s[0] || null;
             if (!line) continue;
 
@@ -277,8 +485,8 @@ class LineIndex {
     //     return [...this.lineIndex, ...rightStart, ...bottomStart, ...leftStart]
     // }
 
-    lineIndexFlatList(indexDb : TileEdgeLineIndex) {
-        const rem : TiledLine [] = [];
+    lineIndexFlatList(indexDb: TileEdgeLineIndex) {
+        const rem: TiledLine[] = [];
         for (const [edge, node] of Object.entries(indexDb)) {
             //console.log( edge, node)
             rem.push(...node.s)
@@ -298,12 +506,19 @@ class LineIndex {
         return this.getRemaining().length;
     }
 
-    createLineIndex(lines, minXY, maxXY) {
+    createLineEdgeIndexFromLines(lines, minXY, maxXY) {
         const lineObjects = lines.map(l => {
-            return new TiledLine(l, minXY, maxXY)
-        })
-
+            return new TiledLine(l, minXY, maxXY);
+        });
+        return this.createLineEdgeIndex(lineObjects, minXY, maxXY)
+    }
+    createLineEdgeIndex(lineObjectsAll, minXY, maxXY) {
+        // const lineObjects = lines.map(l => {
+        //     return new TiledLine(l, minXY, maxXY);
+        // });
         // console.log( inner )
+
+        const lineObjects = lineObjectsAll.filter(l => (!l.isClosed && !l.isTiny))
 
         const topStart = lineObjects.filter(lo => lo.brd.start == 1).sort((a, b) => {
             return (a.start.x - b.start.x)
@@ -374,19 +589,19 @@ class LineIndex {
         return this.findNext2(point, edge, "start");
     }
 
-    
 
-    static findOnEdge(lineIndex:TileEdgeLineIndex, edge : EdgeId, startOrEnd: LineEndingDirection, mode: SearchDirection, point?: LinePoint) {
+
+    static findOnEdge(lineIndex: TileEdgeLineIndex, edge: EdgeId, startOrEnd: LineEndingDirection, mode: SearchDirection, point?: LinePoint) {
 
         let lineCandiates = LineIndex.getEdgeLisFromIndex(lineIndex, edge, startOrEnd);
 
         if (!lineCandiates) return undefined;
 
-        if ( !point && mode != "first") throw new Error("point is missing for mode: " + mode)
+        if (!point && mode != "first") throw new Error("point is missing for mode: " + mode)
         // console.log("findOnEdge",edge,startOrEnd,mode,point)
 
         if (mode == "after") {
-            if(!point) throw new Error("point is missing for mode: " + mode)
+            if (!point) throw new Error("point is missing for mode: " + mode)
             if (edge == 1) return lineCandiates.find(l => l[startOrEnd].x > point.x);
             if (edge == 2) return lineCandiates.find(l => l[startOrEnd].y > point.y);
             if (edge == 4) return lineCandiates.find(l => l[startOrEnd].x < point.x);
@@ -394,7 +609,7 @@ class LineIndex {
             throw new Error("findOnEdge: invalid edge " + edge)
         }
         else if (mode == "before") {
-            if(!point) throw new Error("point is missing for mode: " + mode)
+            if (!point) throw new Error("point is missing for mode: " + mode)
             if (edge == 1) return lineCandiates.find(l => l[startOrEnd].x < point.x);
             if (edge == 2) return lineCandiates.find(l => l[startOrEnd].y < point.y);
             if (edge == 4) return lineCandiates.find(l => l[startOrEnd].x > point.x);
@@ -423,8 +638,8 @@ class LineIndex {
      * @param startOrEnd start|end: selector of line-ending to search for 
      * @returns 
      */
-    static findNextEdgeLine(lineIndex:TileEdgeLineIndex, point: LinePoint, pointEdge: EdgeId, startOrEnd: LineEndingDirection) {
-        let found : TiledLine| undefined ;
+    static findNextEdgeLine(lineIndex: TileEdgeLineIndex, point: LinePoint, pointEdge: EdgeId, startOrEnd: LineEndingDirection) {
+        let found: TiledLine | undefined;
         // direction clockwise
         // start at edge of point
         let startIndex = EDGES.indexOf(pointEdge)
@@ -461,7 +676,7 @@ class LineIndex {
         throw new Error("get: invalid startOrEnd: " + startOrEnd);
     }
 
-    get(edge: EdgeId, startOrEnd?: LineEndingDirection ) {
+    get(edge: EdgeId, startOrEnd?: LineEndingDirection) {
         const list = this.lineIndex[edge]
         if (!startOrEnd) return list;
         if (startOrEnd == "start") return list.s;
@@ -484,14 +699,19 @@ class LineIndex {
         return this.debugIndexDB(this.lineIndex)
     }
 
-    debugIndexDB(lineIndex : TileEdgeLineIndex) {
-        const debug : any = {
-            all : [],
+    debugIndexDB(lineIndex: TileEdgeLineIndex) {
+        const debug: any = {
+            all: [],
+            inner: [],
         }
 
 
 
-        const toString = (l : TiledLine ) => {
+        const toString = (l: TiledLine) => {
+
+            if (l.isClosed) {
+                return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `
+            }
 
             let closable = (this.lineIsClosable(l)) ? "closable" : "";
 
@@ -508,11 +728,13 @@ class LineIndex {
         for (const line of this.lineIndexFlatList(lineIndex)) {
             debug.all.push(toString(line))
         }
-
+        for (const line of this.inner) {
+            debug.inner.push(toString(line));
+        }
         return debug;
     }
 
-    removeFromSearch(line : TiledLine ) {
+    removeFromSearch(line: TiledLine) {
         //  console.log( "REMOVE:",line )
         // console.log(this.debugIndex())
         for (const [edge, node] of Object.entries(this.lineIndex)) {
@@ -528,7 +750,7 @@ class LineIndex {
     /** check if line is closable by adding tile corners, 
      * so that no other lines ar found along the tile edges  
      **/
-    lineIsClosable(line ) {
+    lineIsClosable(line) {
         //throw new Error("Disabled lineIsClosable")
         if (!line) return false;
 
@@ -545,21 +767,21 @@ class LineIndex {
     /**
      * create a closed polygon for the full tile
      */
-    static getFullTilePolygon(minXY:number, maxXY:number){
-        const corners = LineIndex.getTileCornersCounterClockWiseCount(1,4,minXY, maxXY);
+    static getFullTilePolygon(minXY: number, maxXY: number) {
+        const corners = LineIndex.getTileCornersCounterClockWiseCount(1, 4, minXY, maxXY);
         //Close polygon
         corners.push(corners[0])
         corners.push(corners[1])
         return corners;
     }
 
-    static getTileCornersCounterClockWiseCount(edgeStart:EdgeId, count:number, minXY:number, maxXY:number) {
+    static getTileCornersCounterClockWiseCount(edgeStart: EdgeId, count: number, minXY: number, maxXY: number) {
         if (!EDGES.includes(edgeStart)) throw new Error("getTileCornersClockWise: invalid edgeStart " + edgeStart)
         if (count < 0 || count > 4) throw new Error("getTileCornersClockWise: invalid count " + count)
 
         const dbg = false;
 
-        const corners : number [] = [];
+        const corners: number[] = [];
 
         const wrapIndex = (value) => {
             const start = 0;
@@ -592,7 +814,7 @@ class LineIndex {
 
         const dbg = false;
 
-        const corners : number [] = [];
+        const corners: number[] = [];
 
         let startIndex = EDGES.indexOf(edgeStart)
 
@@ -630,13 +852,13 @@ class LineIndex {
      * @returns 
      */
     getTileCornersCounterClockWiseBetweenLines(line1, line2, minXY, maxXY) {
-        const sameEdge = this.lineFollowsCounterClockwiseOnSameEdge(line1,line2);
+        const sameEdge = this.lineFollowsCounterClockwiseOnSameEdge(line1, line2);
 
-        if(sameEdge) {
+        if (sameEdge) {
             //console.log(`corner sameEdge`)
             return LineIndex.getTileCornersCounterClockWiseCount(line1.brd.end, 4, minXY, maxXY);
         }
-        return this.getTileCornersCounterClockWise( line1.brd.end, line2.brd.start,minXY,maxXY );
+        return this.getTileCornersCounterClockWise(line1.brd.end, line2.brd.start, minXY, maxXY);
     }
 
 
@@ -647,10 +869,10 @@ class LineIndex {
      * @param {*} line2 
      * @returns 
      */
-    lineFollowsCounterClockwiseOnSameEdge(line1,line2) {
+    lineFollowsCounterClockwiseOnSameEdge(line1, line2) {
         if (line1.brd.end != line2.brd.start)
             return false; //throw new Error("isEndBeforeStartSameEdge: not on same edge");
-        
+
         const end = line1.end;
         const start = line2.start;
 
@@ -764,13 +986,13 @@ class LineIndex {
     }
 
 
-    appendLinesToClone(lineIn: TiledLine, buffer, minXY:number, maxXY:number) {
-        const dbg = false;
+    appendLinesToClone(lineIn: TiledLine, buffer, minXY: number, maxXY: number) {
+        const dbg: string = `${0}`;
 
         const bufferRev = [...buffer].reverse()
         const line = lineIn.clone();
 
-        if (dbg) console.log("appendLinesToClone", bufferRev)
+        if (dbg == "1") console.log("appendLinesToClone", bufferRev)
 
         for (const buffLine of bufferRev) {
             // buffLine is appended 
@@ -778,15 +1000,17 @@ class LineIndex {
             // buffline start will always be before
             //const lineEndEdge = line.brd.end
             //const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
-            
+
             const corners = this.getTileCornersCounterClockWiseBetweenLines(line, buffLine, minXY, maxXY);
 
-            if (dbg) console.log("appendLinesToClone - add corners: ", corners)
+            if (dbg == "1") {
+                console.log("appendLinesToClone - add corners: ", corners)
+            }
 
             // insert corners if req
             line.appendCornersAtEnd(corners, minXY, maxXY)
 
-            if (dbg) console.log("appendLinesToClone - add line: ", buffLine)
+            if (dbg == "1") console.log("appendLinesToClone - add line: ", buffLine)
             line.appendLine(buffLine, minXY, maxXY)
 
         }
@@ -809,6 +1033,13 @@ class LineIndex {
         return true
     }
 
+    toArrayAllInner(lineFilter) {
+
+        const useFilter = (lineFilter) ? lineFilter : () => true;
+
+        return [...this.all.filter(useFilter).map(tl => tl.line), ...this.inner.filter(useFilter).map(tl => tl.line),]
+    }
+
 } // class LineINdex
 
 /**
@@ -821,14 +1052,14 @@ class LineIndex {
  */
 export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: TileInformation) {
 
-    if( !lines || lines.length < 1 ) return  [];
+    if (!lines || lines.length < 1) return [];
 
-    const newLines : LineArray=[];
-    const dbg = false;
+    const newLines: LineArray = [];
+    const dbg : string= `${0}`;
 
-    const minXY=tileInfo.minXY;
-    const maxXY=tileInfo.maxXY;
-    if( minXY == undefined || maxXY == undefined ) throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
+    const minXY = tileInfo.minXY;
+    const maxXY = tileInfo.maxXY;
+    if (minXY == undefined || maxXY == undefined) throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
 
     const lineIndex = new LineIndex(lines, minXY, maxXY)
     // console.log( "INDEX",lineIndex.debugIndex() ) 
@@ -846,13 +1077,13 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     while (line) {
         i++;
         // stop if first line is reached again
-        if ( (i > 1 && firstline == line) || i > 50) {
+        if ((i > 1 && firstline == line) || i > 50) {
             line = null;
             if (dbg) console.log("=== END : reached first again", i)
             break;
         };
 
-        if ( i > initLineCount) {
+        if (i > initLineCount) {
             line = null;
             if (dbg) console.log("=== END : initial line count reached", i)
             break;
@@ -860,22 +1091,22 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
 
         if (dbg) console.log("LINE " + i, line)
 
-        let appendingLines : TiledLine [] = [];
-        
+        let appendingLines: TiledLine[] = [];
+
 
         let nextAppendLine = line
         // look for all lines with edge contact in clockwise
         for (let appendLoopCount = 0; appendLoopCount < initLineCount; appendLoopCount++) {
-            
+
             //if (appendLoopCount == initLineCount-1) {
-                //console.log("WARN: appendLoop has reached init line count");
+            //console.log("WARN: appendLoop has reached init line count");
             //}
 
             //the next line which end is on the edge can be appended
             let nextLine = lineIndex.findNext2(nextAppendLine.start, nextAppendLine.brd.start, "end")
-            
-            if(!nextLine){
-                console.log("ERROR: during appendLoop, next line is empty, count:"+appendLoopCount, {line,nextAppendLine})
+
+            if (!nextLine) {
+                console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { line, nextAppendLine })
                 break;
             }
 
@@ -886,7 +1117,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
             }
             if (dbg) console.log("appendLoop: testing line", nextLine)
 
-            if(nextLine) appendingLines.push(nextLine)
+            if (nextLine) appendingLines.push(nextLine)
             nextAppendLine = nextLine
         }
 
@@ -899,20 +1130,47 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
         line = lineIndex.getFirst();
     }
 
-
-
-
     lineIndex.finalPool.forEach(l => {
         // console.log(l.line)
 
-        if(l.line) newLines.push(l.line)
+        if (l.line) newLines.push(l.line)
     })
 
 
-    lineIndex.inner.forEach(l => {
-        // console.log(l.line)
-        if(l.line) newLines.push(l.line)
-    })
+    const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32]
+    const fullTileCW = [-32, -32, 4128, -32, 4128, 4128, -32, 4128, -32, -32]
+
+    const innerOnlyClockwise = lineIndex.inner.every(l => l.winding == "cw")
+    try {
+        // handles special - closed inner polys, with LOWER terrain, must be holes in full tile
+        if (innerOnlyClockwise) {
+            if(dbg=="1") console.log("inner only clockwise holes: ", lineIndex.inner, { final: lineIndex.finalPool.length > 0 })
+
+            // these cases are not handled correctly, must be holes in other polygons
+            if (lineIndex.finalPool.length > 0) throw new Error("error: inner Clockwise polys + non-inner polys (final)")
+            if (lineIndex.remainCount > 0) throw new Error("error: inner Clockwise polys + remainCount: " + lineIndex.remainCount)
+
+            const innerLines = lineIndex.inner.filter(l=> l.line).map(l => l.line) as LineDefinition[]
+            // add as holes to full tile poly
+            newLines.push(fullTileCCW, ...innerLines );
+            lineIndex.inner = [];
+        }
+    } catch (e) {
+        console.log(e)
+    }
+
+
+    const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw")
+    // add inner holes with HIGH terrain
+    if (innerHighPolygons.length > 0) {
+        if(dbg=="1") console.log("inner HIGH polys: ", innerHighPolygons)
+
+        innerHighPolygons.forEach(l => {
+            // newLines.push(l.line);
+        })
+
+        lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
+    }
 
 
     const rem = lineIndex.getRemaining();
@@ -923,24 +1181,13 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     }
     rem.forEach(l => {
         // console.log(l.line)
-        if(l.line) newLines.push(l.line)
+        if (l.line) newLines.push(l.line)
     })
 
     for (let line of lines) {
         //  line = checkLine(line, minXY,maxXY)
         //  console.log(line)
         // newLines.push( line );
-    }
-
-    function findAbnormal(line){
-        for ( let i=0; i<line.length; i+=2 ){
-            const x = line[0]
-            const y = line[1]
-            console.log(x,y)
-            if (x == -32 && y == -32 ) {
-                console.log(`abnormal lt at ${i}`, line)
-            }
-        }
     }
 
     for (let line of lines) {

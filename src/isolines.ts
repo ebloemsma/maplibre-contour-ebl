@@ -204,7 +204,7 @@ export default function generateIsolines(
   
   const minXY = multiplier * (0 - 1);
   const maxXY = 4096 + Math.abs(minXY);
-  const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y);
+  const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y, tile);
   fullTile.minXY = minXY;
   fullTile.maxXY = maxXY;
 
@@ -386,7 +386,11 @@ export default function generateIsolines(
     }
   }
 
-  
+  //console.log( fullTile.toString() )
+
+  //const { edgeMin, edgeMax } = ispolygons.findTileEdgeMinMax(tile)
+
+  //console.log("segm", segments)
 
   // ISOPOLY: convert lines to polygons
   if ( isoOptions.polygons ) {
@@ -419,7 +423,20 @@ export default function generateIsolines(
     } catch (e) {
       console.log(e);
     }
-  }
+  } else {
+
+    const isos = {};
+    for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
+        // const levelIsoLines = segments[elevationLevel]
+        const lineIndex = new ispolygons.LineIndex(elevationIsoLines, minXY, maxXY);
+        console.log("lineIndex isos", elevationLevel, lineIndex.debugIndex())
+        //if (polys.length > 0)
+        isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
+    }
+    return isos
+
+
+}
 
   return segments;
 }
