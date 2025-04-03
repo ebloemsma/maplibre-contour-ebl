@@ -117,6 +117,23 @@
         // }
         return fullTilePolygons;
     }
+    function findTileEdgeMinMax(tile) {
+        let edgeMin = -Infinity;
+        let edgeMax = Infinity;
+        for (let col = 0; col < tile.width; col++) {
+            const top = tile.get(0, col);
+            const botom = tile.get(tile.height - 1, col);
+            edgeMin = Math.max(edgeMin, top, botom);
+            edgeMax = Math.min(edgeMax, top, botom);
+        }
+        for (let row = 0; row < tile.height; row++) {
+            const left = tile.get(row, 0);
+            const right = tile.get(row, tile.width - 1);
+            edgeMin = Math.max(edgeMin, left, right);
+            edgeMax = Math.min(edgeMax, left, right);
+        }
+        return { edgeMin, edgeMax };
+    }
     function analyzePolygon(coords) {
         if (coords.length < 6) {
             throw new Error("A polygon must have at least 3 points (6 coordinates).");
@@ -264,13 +281,15 @@
     class LineIndex {
         constructor(lines, minXY, maxXY) {
             this.finalPool = [];
+            this.filtered = [];
             this.inner = [];
-            this.lineIndex = this.createLineIndex(lines, minXY, maxXY);
-            this.origIndex = this.createLineIndex(lines, minXY, maxXY);
+            this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
+            this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
             this.finalPool = [];
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
+            this.filtered = lineObjects.filter(l => (!l.isClosed && !l.isTiny));
             this.inner = lineObjects.filter(lo => lo.brd.start == 0 || lo.brd.end == 0);
         }
         getFirst() {
@@ -308,11 +327,18 @@
         get remainCount() {
             return this.getRemaining().length;
         }
-        createLineIndex(lines, minXY, maxXY) {
+        createLineEdgeIndexFromLines(lines, minXY, maxXY) {
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
+            return this.createLineEdgeIndex(lineObjects, minXY, maxXY);
+        }
+        createLineEdgeIndex(lineObjectsAll, minXY, maxXY) {
+            // const lineObjects = lines.map(l => {
+            //     return new TiledLine(l, minXY, maxXY);
+            // });
             // console.log( inner )
+            const lineObjects = lineObjectsAll.filter(l => (!l.isClosed && !l.isTiny));
             const topStart = lineObjects.filter(lo => lo.brd.start == 1).sort((a, b) => {
                 return (a.start.x - b.start.x);
             });
@@ -478,6 +504,7 @@
         debugIndexDB(lineIndex) {
             const debug = {
                 all: [],
+                inner: [],
             };
             const toString = (l) => {
                 if (l.isClosed) {
@@ -718,16 +745,24 @@
             return line;
         }
         appendLinesToClone(lineIn, buffer, minXY, maxXY) {
+            const dbg = `${0}`;
             const bufferRev = [...buffer].reverse();
             const line = lineIn.clone();
+            if (dbg)
+                console.log("appendLinesToClone", bufferRev);
             for (const buffLine of bufferRev) {
                 // buffLine is appended 
                 // buffline start will always be before
                 //const lineEndEdge = line.brd.end
                 //const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
                 const corners = this.getTileCornersCounterClockWiseBetweenLines(line, buffLine, minXY, maxXY);
+                if (dbg) {
+                    console.log("appendLinesToClone - add corners: ", corners);
+                }
                 // insert corners if req
                 line.appendCornersAtEnd(corners, minXY, maxXY);
+                if (dbg)
+                    console.log("appendLinesToClone - add line: ", buffLine);
                 line.appendLine(buffLine, minXY, maxXY);
             }
             this.closeLine(line, minXY, maxXY);
@@ -1169,6 +1204,9 @@
                 }
             }
         }
+        const { edgeMin, edgeMax } = findTileEdgeMinMax(tile);
+        console.log("Edges", edgeMax, edgeMin);
+        console.log("segm", segments);
         // ISOPOLY: convert lines to polygons
         if (isoOptions.polygons) {
             if (dbg == "1")
@@ -1199,6 +1237,17 @@
             catch (e) {
                 console.log(e);
             }
+        }
+        else {
+            const isos = {};
+            for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
+                // const levelIsoLines = segments[elevationLevel]
+                const lineIndex = new LineIndex(elevationIsoLines, minXY, maxXY);
+                console.log("lineIndex isos", elevationLevel, lineIndex.debugIndex());
+                //if (polys.length > 0)
+                isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
+            }
+            return isos;
         }
         return segments;
     }
