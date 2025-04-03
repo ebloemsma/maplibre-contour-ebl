@@ -169,14 +169,6 @@
     }
     class TiledLine {
         constructor(line, minXY, maxXY) {
-            this.toString = () => {
-                var _a;
-                const l = this;
-                if (l.isClosed) {
-                    return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
-                }
-                return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
-            };
             this.done = false;
             if (line) {
                 this.line = [...line],
@@ -258,6 +250,15 @@
             this.line.push(this.line[1]);
             this.update(minXY, maxXY);
         }
+        toString() {
+            var _a;
+            const l = this;
+            if (l.isClosed) {
+                return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
+            }
+            return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
+        }
+        ;
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
