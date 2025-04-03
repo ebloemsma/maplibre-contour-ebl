@@ -184,6 +184,15 @@
                 this.minXY = minXY;
                 this.maxXY = maxXY;
             }
+        }
+        update(minXY, maxXY) {
+            if (!this.line)
+                throw new Error("empty this.line");
+            const l = this.line;
+            const border = getLineBorderCode(l, minXY, maxXY);
+            this.start = getLineFirst(l);
+            this.end = getLineLast(l);
+            this.brd = border;
             // cw : inner lower
             // ccw: inner is higher
             if (this.isClosed) {
@@ -194,15 +203,6 @@
                 this.winding = polyInfo.winding;
                 this.area = polyInfo.area;
             }
-        }
-        update(minXY, maxXY) {
-            if (!this.line)
-                throw new Error("empty this.line");
-            const l = this.line;
-            const border = getLineBorderCode(l, minXY, maxXY);
-            this.start = getLineFirst(l);
-            this.end = getLineLast(l);
-            this.brd = border;
         }
         clone() {
             const line = new TiledLine(this.line, this.minXY, this.maxXY);
