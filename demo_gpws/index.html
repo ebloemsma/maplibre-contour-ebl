@@ -112,17 +112,14 @@
   </div>
   <script>
 
-    const TILESERVER_AWS = "https://elevation-tiles-prod.s3.amazonaws.com/terrarium"
-    const TILESERVER_LOCAL_SEATTLE = "http://localhost:8080/services/seattle-mz/tiles/"
-
-    const demTileServerBaseUrl = TILESERVER_AWS;
+    const demTileServerBaseUrl = getLocalTileServerUrl("seattle-mz");
 
     const demSource = new mlcontour.DemSource({
       url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
       //url: "http://localhost:8080/services/seattle-mz/tiles/{z}/{x}/{y}.png", 
       encoding: "terrarium",
-      maxzoom: 10,
-      minzoom: 10,
+      maxzoom: 12,
+      minzoom: 5,
 
       
     });
@@ -181,7 +178,7 @@
                 // meters to feet
                 multiplier: 3.28084,
                 overzoom: 1,
-                maxFetchZoom: 6,
+                maxFetchZoom: 10,
                 thresholds: {
                   // zoom: [minor, major]
                   // 3: [100, 100],

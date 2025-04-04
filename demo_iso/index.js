@@ -36,14 +36,345 @@
 
     define(['exports'], (function (exports) { 'use strict';
 
+    /**
+     * A standalone point geometry with useful accessor, comparison, and
+     * modification methods.
+     *
+     * @class
+     * @param {number} x the x-coordinate. This could be longitude or screen pixels, or any other sort of unit.
+     * @param {number} y the y-coordinate. This could be latitude or screen pixels, or any other sort of unit.
+     *
+     * @example
+     * const point = new Point(-77, 38);
+     */
+    function Point(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    Point.prototype = {
+        /**
+         * Clone this point, returning a new point that can be modified
+         * without affecting the old one.
+         * @return {Point} the clone
+         */
+        clone() { return new Point(this.x, this.y); },
+
+        /**
+         * Add this point's x & y coordinates to another point,
+         * yielding a new point.
+         * @param {Point} p the other point
+         * @return {Point} output point
+         */
+        add(p) { return this.clone()._add(p); },
+
+        /**
+         * Subtract this point's x & y coordinates to from point,
+         * yielding a new point.
+         * @param {Point} p the other point
+         * @return {Point} output point
+         */
+        sub(p) { return this.clone()._sub(p); },
+
+        /**
+         * Multiply this point's x & y coordinates by point,
+         * yielding a new point.
+         * @param {Point} p the other point
+         * @return {Point} output point
+         */
+        multByPoint(p) { return this.clone()._multByPoint(p); },
+
+        /**
+         * Divide this point's x & y coordinates by point,
+         * yielding a new point.
+         * @param {Point} p the other point
+         * @return {Point} output point
+         */
+        divByPoint(p) { return this.clone()._divByPoint(p); },
+
+        /**
+         * Multiply this point's x & y coordinates by a factor,
+         * yielding a new point.
+         * @param {number} k factor
+         * @return {Point} output point
+         */
+        mult(k) { return this.clone()._mult(k); },
+
+        /**
+         * Divide this point's x & y coordinates by a factor,
+         * yielding a new point.
+         * @param {number} k factor
+         * @return {Point} output point
+         */
+        div(k) { return this.clone()._div(k); },
+
+        /**
+         * Rotate this point around the 0, 0 origin by an angle a,
+         * given in radians
+         * @param {number} a angle to rotate around, in radians
+         * @return {Point} output point
+         */
+        rotate(a) { return this.clone()._rotate(a); },
+
+        /**
+         * Rotate this point around p point by an angle a,
+         * given in radians
+         * @param {number} a angle to rotate around, in radians
+         * @param {Point} p Point to rotate around
+         * @return {Point} output point
+         */
+        rotateAround(a, p) { return this.clone()._rotateAround(a, p); },
+
+        /**
+         * Multiply this point by a 4x1 transformation matrix
+         * @param {[number, number, number, number]} m transformation matrix
+         * @return {Point} output point
+         */
+        matMult(m) { return this.clone()._matMult(m); },
+
+        /**
+         * Calculate this point but as a unit vector from 0, 0, meaning
+         * that the distance from the resulting point to the 0, 0
+         * coordinate will be equal to 1 and the angle from the resulting
+         * point to the 0, 0 coordinate will be the same as before.
+         * @return {Point} unit vector point
+         */
+        unit() { return this.clone()._unit(); },
+
+        /**
+         * Compute a perpendicular point, where the new y coordinate
+         * is the old x coordinate and the new x coordinate is the old y
+         * coordinate multiplied by -1
+         * @return {Point} perpendicular point
+         */
+        perp() { return this.clone()._perp(); },
+
+        /**
+         * Return a version of this point with the x & y coordinates
+         * rounded to integers.
+         * @return {Point} rounded point
+         */
+        round() { return this.clone()._round(); },
+
+        /**
+         * Return the magnitude of this point: this is the Euclidean
+         * distance from the 0, 0 coordinate to this point's x and y
+         * coordinates.
+         * @return {number} magnitude
+         */
+        mag() {
+            return Math.sqrt(this.x * this.x + this.y * this.y);
+        },
+
+        /**
+         * Judge whether this point is equal to another point, returning
+         * true or false.
+         * @param {Point} other the other point
+         * @return {boolean} whether the points are equal
+         */
+        equals(other) {
+            return this.x === other.x &&
+                   this.y === other.y;
+        },
+
+        /**
+         * Calculate the distance from this point to another point
+         * @param {Point} p the other point
+         * @return {number} distance
+         */
+        dist(p) {
+            return Math.sqrt(this.distSqr(p));
+        },
+
+        /**
+         * Calculate the distance from this point to another point,
+         * without the square root step. Useful if you're comparing
+         * relative distances.
+         * @param {Point} p the other point
+         * @return {number} distance
+         */
+        distSqr(p) {
+            const dx = p.x - this.x,
+                dy = p.y - this.y;
+            return dx * dx + dy * dy;
+        },
+
+        /**
+         * Get the angle from the 0, 0 coordinate to this point, in radians
+         * coordinates.
+         * @return {number} angle
+         */
+        angle() {
+            return Math.atan2(this.y, this.x);
+        },
+
+        /**
+         * Get the angle from this point to another point, in radians
+         * @param {Point} b the other point
+         * @return {number} angle
+         */
+        angleTo(b) {
+            return Math.atan2(this.y - b.y, this.x - b.x);
+        },
+
+        /**
+         * Get the angle between this point and another point, in radians
+         * @param {Point} b the other point
+         * @return {number} angle
+         */
+        angleWith(b) {
+            return this.angleWithSep(b.x, b.y);
+        },
+
+        /**
+         * Find the angle of the two vectors, solving the formula for
+         * the cross product a x b = |a||b|sin(θ) for θ.
+         * @param {number} x the x-coordinate
+         * @param {number} y the y-coordinate
+         * @return {number} the angle in radians
+         */
+        angleWithSep(x, y) {
+            return Math.atan2(
+                this.x * y - this.y * x,
+                this.x * x + this.y * y);
+        },
+
+        /** @param {[number, number, number, number]} m */
+        _matMult(m) {
+            const x = m[0] * this.x + m[1] * this.y,
+                y = m[2] * this.x + m[3] * this.y;
+            this.x = x;
+            this.y = y;
+            return this;
+        },
+
+        /** @param {Point} p */
+        _add(p) {
+            this.x += p.x;
+            this.y += p.y;
+            return this;
+        },
+
+        /** @param {Point} p */
+        _sub(p) {
+            this.x -= p.x;
+            this.y -= p.y;
+            return this;
+        },
+
+        /** @param {number} k */
+        _mult(k) {
+            this.x *= k;
+            this.y *= k;
+            return this;
+        },
+
+        /** @param {number} k */
+        _div(k) {
+            this.x /= k;
+            this.y /= k;
+            return this;
+        },
+
+        /** @param {Point} p */
+        _multByPoint(p) {
+            this.x *= p.x;
+            this.y *= p.y;
+            return this;
+        },
+
+        /** @param {Point} p */
+        _divByPoint(p) {
+            this.x /= p.x;
+            this.y /= p.y;
+            return this;
+        },
+
+        _unit() {
+            this._div(this.mag());
+            return this;
+        },
+
+        _perp() {
+            const y = this.y;
+            this.y = this.x;
+            this.x = -y;
+            return this;
+        },
+
+        /** @param {number} angle */
+        _rotate(angle) {
+            const cos = Math.cos(angle),
+                sin = Math.sin(angle),
+                x = cos * this.x - sin * this.y,
+                y = sin * this.x + cos * this.y;
+            this.x = x;
+            this.y = y;
+            return this;
+        },
+
+        /**
+         * @param {number} angle
+         * @param {Point} p
+         */
+        _rotateAround(angle, p) {
+            const cos = Math.cos(angle),
+                sin = Math.sin(angle),
+                x = p.x + cos * (this.x - p.x) - sin * (this.y - p.y),
+                y = p.y + sin * (this.x - p.x) + cos * (this.y - p.y);
+            this.x = x;
+            this.y = y;
+            return this;
+        },
+
+        _round() {
+            this.x = Math.round(this.x);
+            this.y = Math.round(this.y);
+            return this;
+        },
+
+        constructor: Point
+    };
+
+    /**
+     * Construct a point from an array if necessary, otherwise if the input
+     * is already a Point, return it unchanged.
+     * @param {Point | [number, number] | {x: number, y: number}} p input value
+     * @return {Point} constructed point.
+     * @example
+     * // this
+     * var point = Point.convert([0, 1]);
+     * // is equivalent to
+     * var point = new Point(0, 1);
+     */
+    Point.convert = function (p) {
+        if (p instanceof Point) {
+            return /** @type {Point} */ (p);
+        }
+        if (Array.isArray(p)) {
+            return new Point(+p[0], +p[1]);
+        }
+        if (p.x !== undefined && p.y !== undefined) {
+            return new Point(+p.x, +p.y);
+        }
+        throw new Error('Expected [x, y] or {x, y} point format');
+    };
+
     class TileInformation {
-        constructor(z, x, y) {
+        setTile(tile) {
+            const { edgeMin, edgeMax } = findTileEdgeMinMax(tile);
+            this.edgeMin = Math.round(edgeMin);
+            this.edgeMax = Math.round(edgeMax);
+        }
+        constructor(z, x, y, tile) {
             this.z = z;
             this.y = y;
             this.x = x;
+            if (tile)
+                this.setTile(tile);
         }
         toString() {
-            return `TileInfo: z,x,y: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  min/maxXY: ${this.minXY},${this.maxXY} `;
+            return `TileInfo: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  edgemin/max: ${this.edgeMin}/${this.edgeMax}`; //min/maxXY: ${this.minXY},${this.maxXY} `
         }
     }
     function findBorder(x, y, minXY, maxXY) {
@@ -117,6 +448,73 @@
         // }
         return fullTilePolygons;
     }
+    function findTileEdgeMinMax(tile) {
+        let edgeMin = -Infinity;
+        let edgeMax = Infinity;
+        for (let col = 0; col < tile.width; col++) {
+            const top = tile.get(0, col);
+            const botom = tile.get(tile.height - 1, col);
+            edgeMin = Math.max(edgeMin, top, botom);
+            edgeMax = Math.min(edgeMax, top, botom);
+        }
+        for (let row = 0; row < tile.height; row++) {
+            const left = tile.get(row, 0);
+            const right = tile.get(row, tile.width - 1);
+            edgeMin = Math.max(edgeMin, left, right);
+            edgeMax = Math.min(edgeMax, left, right);
+        }
+        return { edgeMin, edgeMax };
+    }
+    function analyzePolygon(coords) {
+        if (coords.length < 6) {
+            throw new Error("A polygon must have at least 3 points (6 coordinates).");
+        }
+        if (coords.length % 2 !== 0) {
+            throw new Error("Coordinate list must have an even number of values (x, y pairs).");
+        }
+        // Check if the polygon is closed
+        const firstX = coords[0];
+        const firstY = coords[1];
+        const lastX = coords[coords.length - 2];
+        const lastY = coords[coords.length - 1];
+        if (firstX !== lastX || firstY !== lastY) {
+            throw new Error("Polygon must be closed (first and last points must match).");
+        }
+        // https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+        let area = 0;
+        let perimeter = 0;
+        const numPoints = coords.length / 2;
+        for (let i = 0; i < numPoints; i++) {
+            const x1 = coords[2 * i];
+            const y1 = coords[2 * i + 1];
+            const x2 = coords[(2 * ((i + 1) % numPoints))];
+            const y2 = coords[(2 * ((i + 1) % numPoints)) + 1];
+            // Shoelace formula component
+            area += (x1 * y2 - x2 * y1);
+            // Distance between consecutive points
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            perimeter += Math.hypot(dx, dy);
+        }
+        const signedArea = area / 2;
+        const absoluteArea = Math.abs(signedArea);
+        const winding = signedArea < 0 ? 'ccw' : 'cw';
+        //const isTiny = absoluteArea < 50*50;
+        // let min = Infinity;
+        // let max = -Infinity;
+        // iteratePointsInsidePolygon(coords, (x, y) => {
+        //     const elev = tile.get(x,y)
+        //     min = Math.min(min, elev)
+        //     max = Math.max(max, elev)
+        // })
+        return {
+            //isTiny,
+            signedArea,
+            area: absoluteArea,
+            length: perimeter,
+            winding
+        };
+    }
     class TiledLine {
         constructor(line, minXY, maxXY) {
             this.done = false;
@@ -135,6 +533,16 @@
             this.start = getLineFirst(l);
             this.end = getLineLast(l);
             this.brd = border;
+            // cw : inner lower
+            // ccw: inner is higher
+            if (this.isClosed) {
+                const polyInfo = analyzePolygon(this.line);
+                this.info = polyInfo;
+                //this.isTiny = polyInfo.isTiny
+                this.length = polyInfo.length;
+                this.winding = polyInfo.winding;
+                this.area = polyInfo.area;
+            }
         }
         clone() {
             const line = new TiledLine(this.line, this.minXY, this.maxXY);
@@ -142,6 +550,9 @@
         }
         get hash() {
             return hashArray(this.line);
+        }
+        get isTiny() {
+            return (this.area != undefined) ? this.area < 50 * 50 : null;
         }
         get isClosed() {
             if (!this.line)
@@ -187,18 +598,29 @@
             this.line.push(this.line[1]);
             this.update(minXY, maxXY);
         }
+        toString() {
+            var _a;
+            const l = this;
+            if (l.isClosed) {
+                return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
+            }
+            return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
+        }
+        ;
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
         constructor(lines, minXY, maxXY) {
             this.finalPool = [];
+            this.filtered = [];
             this.inner = [];
-            this.lineIndex = this.createLineIndex(lines, minXY, maxXY);
-            this.origIndex = this.createLineIndex(lines, minXY, maxXY);
+            this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
+            this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
             this.finalPool = [];
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
+            this.filtered = lineObjects.filter(l => (!l.isClosed && !l.isTiny));
             this.inner = lineObjects.filter(lo => lo.brd.start == 0 || lo.brd.end == 0);
         }
         getFirst() {
@@ -236,11 +658,18 @@
         get remainCount() {
             return this.getRemaining().length;
         }
-        createLineIndex(lines, minXY, maxXY) {
+        createLineEdgeIndexFromLines(lines, minXY, maxXY) {
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
+            return this.createLineEdgeIndex(lineObjects, minXY, maxXY);
+        }
+        createLineEdgeIndex(lineObjectsAll, minXY, maxXY) {
+            // const lineObjects = lines.map(l => {
+            //     return new TiledLine(l, minXY, maxXY);
+            // });
             // console.log( inner )
+            const lineObjects = lineObjectsAll.filter(l => (!l.isClosed && !l.isTiny));
             const topStart = lineObjects.filter(lo => lo.brd.start == 1).sort((a, b) => {
                 return (a.start.x - b.start.x);
             });
@@ -406,8 +835,12 @@
         debugIndexDB(lineIndex) {
             const debug = {
                 all: [],
+                inner: [],
             };
             const toString = (l) => {
+                if (l.isClosed) {
+                    return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
+                }
                 let closable = (this.lineIsClosable(l)) ? "closable" : "";
                 return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y} ${closable}]`;
             };
@@ -419,6 +852,9 @@
             }
             for (const line of this.lineIndexFlatList(lineIndex)) {
                 debug.all.push(toString(line));
+            }
+            for (const line of this.inner) {
+                debug.inner.push(toString(line));
             }
             return debug;
         }
@@ -640,16 +1076,24 @@
             return line;
         }
         appendLinesToClone(lineIn, buffer, minXY, maxXY) {
+            const dbg = `${0}`;
             const bufferRev = [...buffer].reverse();
             const line = lineIn.clone();
+            if (dbg == "1")
+                console.log("appendLinesToClone", bufferRev);
             for (const buffLine of bufferRev) {
                 // buffLine is appended 
                 // buffline start will always be before
                 //const lineEndEdge = line.brd.end
                 //const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
                 const corners = this.getTileCornersCounterClockWiseBetweenLines(line, buffLine, minXY, maxXY);
+                if (dbg == "1") {
+                    console.log("appendLinesToClone - add corners: ", corners);
+                }
                 // insert corners if req
                 line.appendCornersAtEnd(corners, minXY, maxXY);
+                if (dbg == "1")
+                    console.log("appendLinesToClone - add line: ", buffLine);
                 line.appendLine(buffLine, minXY, maxXY);
             }
             this.closeLine(line, minXY, maxXY);
@@ -657,6 +1101,10 @@
         }
         checkAndClosableLine(line, minXY, maxXY) {
             throw new Error("Disabled checkAndClosableLine");
+        }
+        toArrayAllInner(lineFilter) {
+            const useFilter = (lineFilter) ? lineFilter : () => true;
+            return [...this.all.filter(useFilter).map(tl => tl.line), ...this.inner.filter(useFilter).map(tl => tl.line),];
         }
     } // class LineINdex
     /**
@@ -672,6 +1120,7 @@
         if (!lines || lines.length < 1)
             return [];
         const newLines = [];
+        const dbg = `${0}`;
         const minXY = tileInfo.minXY;
         const maxXY = tileInfo.maxXY;
         if (minXY == undefined || maxXY == undefined)
@@ -692,12 +1141,18 @@
             // stop if first line is reached again
             if ((i > 1 && firstline == line) || i > 50) {
                 line = null;
+                if (dbg)
+                    console.log("=== END : reached first again", i);
                 break;
             }
             if (i > initLineCount) {
                 line = null;
+                if (dbg)
+                    console.log("=== END : initial line count reached", i);
                 break;
             }
+            if (dbg)
+                console.log("LINE " + i, line);
             let appendingLines = [];
             let nextAppendLine = line;
             // look for all lines with edge contact in clockwise
@@ -713,8 +1168,12 @@
                 }
                 const nextIsSame = line.isIdentical(nextLine);
                 if (nextIsSame) {
+                    if (dbg)
+                        console.log("appendLoop: End self reached, count:", appendingLines.length);
                     break;
                 }
+                if (dbg)
+                    console.log("appendLoop: testing line", nextLine);
                 if (nextLine)
                     appendingLines.push(nextLine);
                 nextAppendLine = nextLine;
@@ -730,13 +1189,46 @@
             if (l.line)
                 newLines.push(l.line);
         });
-        lineIndex.inner.forEach(l => {
-            // console.log(l.line)
-            if (l.line)
-                newLines.push(l.line);
-        });
+        const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
+        const innerOnlyClockwise = lineIndex.inner.every(l => l.winding == "cw");
+        try {
+            // handles special - closed inner polys, with LOWER terrain, must be holes in full tile
+            if (innerOnlyClockwise) {
+                if (dbg == "1")
+                    console.log("inner only clockwise holes: ", lineIndex.inner, { final: lineIndex.finalPool.length > 0 });
+                // these cases are not handled correctly, must be holes in other polygons
+                if (lineIndex.finalPool.length > 0)
+                    throw new Error("error: inner Clockwise polys + non-inner polys (final)");
+                if (lineIndex.remainCount > 0)
+                    throw new Error("error: inner Clockwise polys + remainCount: " + lineIndex.remainCount);
+                const innerLines = lineIndex.inner.filter(l => l.line).map(l => l.line);
+                // add as holes to full tile poly
+                newLines.push(fullTileCCW, ...innerLines);
+                lineIndex.inner = [];
+            }
+        }
+        catch (e) {
+            console.log(e);
+        }
+        const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+        // add inner holes with HIGH terrain
+        if (innerHighPolygons.length > 0) {
+            if (dbg == "1")
+                console.log("inner HIGH polys: ", innerHighPolygons);
+            innerHighPolygons.forEach(l => {
+                // newLines.push(l.line);
+            });
+            lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
+        }
         const rem = lineIndex.getRemaining();
-        if (rem.length) ;
+        if (rem.length) {
+            if (dbg)
+                console.log("REMaining: ", rem.length);
+        }
+        else {
+            if (dbg)
+                console.log("REM empty ");
+        }
         rem.forEach(l => {
             // console.log(l.line)
             if (l.line)
@@ -753,6 +1245,8 @@
             // console.log(line)
             // newLines.push( line );
         }
+        if (dbg)
+            console.log("===============", lineIndex);
         return newLines;
     }
 
@@ -915,13 +1409,10 @@
      * @returns an object where keys are the elevation, and values are a list of `[x1, y1, x2, y2, ...]`
      * contour lines in tile coordinates
      */
-    function generateIsolines( isoOptions, tile, extent = 4096, buffer = 1, x, y, z) {
+    function generateIsolines(isoOptions, tile, extent = 4096, buffer = 1, x, y, z) {
         // if (!interval) {
-        //     return {};
+        //   return {};
         // }
-
-        const dbg= (1==1);
-
         const multiplier = extent / (tile.width - 1);
         let tld, trd, bld, brd;
         let r, c;
@@ -929,11 +1420,14 @@
         const fragmentByStartByLevel = new Map();
         const fragmentByEndByLevel = new Map();
         //ISOPOLYS: need this to identify edges
+        const dbg = `${0}`;
         const minXY = multiplier * (0 - 1);
         const maxXY = 4096 + Math.abs(minXY);
-        const fullTile = new TileInformation(z, x, y);
+        const fullTile = new TileInformation(z, x, y, tile);
         fullTile.minXY = minXY;
         fullTile.maxXY = maxXY;
+        if (dbg == "1")
+            console.log(`genIsolines: ${z}/${y}/${x} `);
         function interpolate(point, threshold, accept) {
             if (point[0] === 0) {
                 // left
@@ -952,26 +1446,18 @@
                 accept(multiplier * (c - ratio(brd, threshold, bld)), multiplier * r);
             }
         }
-
-      
-
-        function createLevelsSet( min, max, levelSet ){
-            return levelSet.filter( l=> l >= min && l <= max);
+        function createLevelsSet(min, max, levelSet) {
+            return levelSet.filter(l => l >= min && l <= max);
         }
-
-        function createLevelsInterval( min, max, interval, filterCb ){
+        function createLevelsInterval(min, max, interval, filterCb) {
             const start = Math.ceil(min / interval) * interval;
             const end = Math.floor(max / interval) * interval;
-
-            const _levels = [];            
-            for ( let threshold = start; threshold <= end; threshold += interval ){
-                if( filterCb && !filterCb(threshold) ) continue;
-                _levels.push( threshold )
+            const _levels = [];
+            for (let threshold = start; threshold <= end; threshold += interval) {
+                _levels.push(threshold);
             }
             return _levels;
         }
-        
-
         // Most marching-squares implementations (d3-contour, gdal-contour) make one pass through the matrix per threshold.
         // This implementation makes a single pass through the matrix, building up all of the contour lines at the
         // same time to improve performance.
@@ -992,10 +1478,10 @@
                 if (isNaN(tld) || isNaN(trd) || isNaN(brd) || isNaN(bld)) {
                     continue;
                 }
-                const lowCutout = -300;
                 const min = Math.min(minL, minR);
                 const max = Math.max(maxL, maxR);
-                
+                // const start = Math.ceil(min / interval) * interval;
+                // const end = Math.floor(max / interval) * interval;
                 //ISOPOLY: set tile ma x and min elevation
                 const maxElev = Math.max(tld, trd, bld, brd);
                 const minElev = Math.min(tld, trd, bld, brd);
@@ -1003,24 +1489,26 @@
                 fullTile.min = Math.min(fullTile.min || Number.MAX_SAFE_INTEGER, minElev);
                 //fullTile.setMin(minElev)
                 //convertTileIsolinesToPolygonsfullTile.setMin(minElev)
-
                 let isoLevels = undefined;
-                if ( isoOptions.levels) {
-                    isoLevels =  createLevelsSet(min,max,isoOptions.levels)
-                } else if ( isoOptions.interval) {
-                    const interval = isoOptions.interval;
-                    isoLevels =  createLevelsInterval(min,max,interval)
-                } else {
+                if (isoOptions.levels) {
+                    isoLevels = createLevelsSet(min, max, isoOptions.levels);
+                }
+                else if (isoOptions.intervals) {
+                    const intervals = isoOptions.intervals;
+                    isoLevels = createLevelsInterval(min, max, intervals[0]);
+                }
+                else {
                     throw new Error("no levels, interval set");
                 }
-
+                if (!isoLevels)
+                    throw new Error("levels is undefined");
+                if (isoOptions.min != null)
+                    isoLevels = isoLevels.filter(l => { var _a; return l >= ((_a = isoOptions.min) !== null && _a !== undefined ? _a : -Infinity); });
                 //const levelStart = ( lowCutout!= undefined) ? Math.max(start,lowCutout) : start;
                 //const isoLevels = createLevels( start ,end, isoOptions )
                 //console.log("isoLevels",isoLevels)
-
                 for (let threshold of isoLevels) {
-                    //if (threshold < lowCutout)
-                    //    continue;
+                    // if ( lowCutout != undefined && threshold < lowCutout ) continue;
                     const tl = tld > threshold;
                     const tr = trd > threshold;
                     const bl = bld > threshold;
@@ -1093,55 +1581,50 @@
                 }
             }
         }
+        //console.log( fullTile.toString() )
+        //const { edgeMin, edgeMax } = ispolygons.findTileEdgeMinMax(tile)
+        //console.log("segm", segments)
         // ISOPOLY: convert lines to polygons
-        if ( isoOptions.polygons ) {
-            
-            const generateFulltileLevels = true; //isoOptions.genFulltilePolygons;
-            const levels = isoOptions.levels;
-
-            console.log(`create tile isopolys:`, fullTile.toString());
-            // if(dbg) console.log("- segements:", segments)
+        if (isoOptions.polygons) {
+            if (dbg == "1")
+                console.log(`create isopolys:`, fullTile.toString());
             try {
                 const isoPolygonsMap = {};
-
-                
                 for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
-                    //console.log(`${key}: ${value}`);
-                
-
-                //for (const elevationLevel of segments) {
-                    //const elevationIsoLines = segments[elevationLevel];
-                    
+                    // const levelIsoLines = segments[elevationLevel]
                     const polys = convertTileIsolinesToPolygons(elevationLevel, elevationIsoLines, fullTile);
                     if (polys.length > 0)
                         isoPolygonsMap[elevationLevel] = polys;
                 }
-                if (dbg)
+                if (dbg == "1")
                     console.log("isoPolygonsMap", isoPolygonsMap);
-
-
+                // generate full tile polys
+                const levels = isoOptions.levels;
                 const fullTilePolys = generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z);
                 if (Object.keys(fullTilePolys).length) {
                     // console.log("fullTilePolys",fullTilePolys );
-                    if (dbg)
+                    if (dbg == "1")
                         console.log(`- fullTilePolys`, fullTilePolys);
                 }
                 const mergedPolys = mergeElevationMaps(isoPolygonsMap, fullTilePolys);
-
-
-                if (dbg)
+                if (dbg == "1")
                     console.log("- mergedPolys:", mergedPolys);
-
-                const lkeys = Object.keys(mergedPolys).map( a => Number(a)).sort( (a,b) => a-b)
-
-                if (dbg)
-                    console.log("- mergedPolys:", lkeys );
-
                 return mergedPolys;
             }
             catch (e) {
                 console.log(e);
             }
+        }
+        else {
+            // const isos = {};
+            // for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
+            //     // const levelIsoLines = segments[elevationLevel]
+            //     const lineIndex = new LineIndex(elevationIsoLines, minXY, maxXY);
+            //     console.log("lineIndex isos", elevationLevel, lineIndex.debugIndex());
+            //     //if (polys.length > 0)
+            //     isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
+            // }
+            // return isos;
         }
         return segments;
     }
@@ -1152,10 +1635,11 @@
      */
     function mergeElevationMaps(map1, map2) {
         const merged = {};
-        
+        const lowCutout = 0;
         for (const [lvlStr, lines] of Object.entries(map1)) {
             const lvl = Number(lvlStr);
-            
+            if (lvl < lowCutout)
+                continue;
             if (!merged[lvl])
                 merged[lvl] = [];
             //console.log("merged--",{...merged})
@@ -1165,7 +1649,8 @@
         for (const [lvlStr, lines] of Object.entries(map2)) {
             // console.log("lvl,merged",lvl,{...merged})
             const lvl = Number(lvlStr);
-            
+            if (lvl < 0)
+                continue;
             if (!merged[lvl])
                 merged[lvl] = [];
             //console.log("merged--",{...merged})
@@ -1174,7 +1659,7 @@
         return merged;
     }
 
-    /*! *****************************************************************************
+    /******************************************************************************
     Copyright (c) Microsoft Corporation.
 
     Permission to use, copy, modify, and/or distribute this software for any
@@ -1188,7 +1673,7 @@
     OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
     PERFORMANCE OF THIS SOFTWARE.
     ***************************************************************************** */
-    /* global Reflect, Promise */
+    /* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
 
     function __rest(s, e) {
@@ -1212,6 +1697,11 @@
             step((generator = generator.apply(thisArg, _arguments || [])).next());
         });
     }
+
+    typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+        var e = new Error(message);
+        return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+    };
 
     function sortedEntries(object) {
         const entries = Object.entries(object);
@@ -1364,16 +1854,16 @@
     }
     function getOptionsForZoom(options, zoom) {
         const { thresholds } = options, rest = __rest(options, ["thresholds"]);
-        let levels = [];
+        let intervals = [];
         let maxLessThanOrEqualTo = -Infinity;
         Object.entries(thresholds).forEach(([zString, value]) => {
             const z = Number(zString);
             if (z <= zoom && z > maxLessThanOrEqualTo) {
                 maxLessThanOrEqualTo = z;
-                levels = typeof value === "number" ? [value] : value;
+                intervals = typeof value === "number" ? [value] : value;
             }
         });
-        return Object.assign({ levels }, rest);
+        return Object.assign({ intervals }, rest);
     }
     function copy(src) {
         const dst = new ArrayBuffer(src.byteLength);
@@ -2907,330 +3397,6 @@
         return result;
     }
 
-    /**
-     * A standalone point geometry with useful accessor, comparison, and
-     * modification methods.
-     *
-     * @class
-     * @param {number} x the x-coordinate. This could be longitude or screen pixels, or any other sort of unit.
-     * @param {number} y the y-coordinate. This could be latitude or screen pixels, or any other sort of unit.
-     *
-     * @example
-     * const point = new Point(-77, 38);
-     */
-    function Point(x, y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    Point.prototype = {
-        /**
-         * Clone this point, returning a new point that can be modified
-         * without affecting the old one.
-         * @return {Point} the clone
-         */
-        clone() { return new Point(this.x, this.y); },
-
-        /**
-         * Add this point's x & y coordinates to another point,
-         * yielding a new point.
-         * @param {Point} p the other point
-         * @return {Point} output point
-         */
-        add(p) { return this.clone()._add(p); },
-
-        /**
-         * Subtract this point's x & y coordinates to from point,
-         * yielding a new point.
-         * @param {Point} p the other point
-         * @return {Point} output point
-         */
-        sub(p) { return this.clone()._sub(p); },
-
-        /**
-         * Multiply this point's x & y coordinates by point,
-         * yielding a new point.
-         * @param {Point} p the other point
-         * @return {Point} output point
-         */
-        multByPoint(p) { return this.clone()._multByPoint(p); },
-
-        /**
-         * Divide this point's x & y coordinates by point,
-         * yielding a new point.
-         * @param {Point} p the other point
-         * @return {Point} output point
-         */
-        divByPoint(p) { return this.clone()._divByPoint(p); },
-
-        /**
-         * Multiply this point's x & y coordinates by a factor,
-         * yielding a new point.
-         * @param {number} k factor
-         * @return {Point} output point
-         */
-        mult(k) { return this.clone()._mult(k); },
-
-        /**
-         * Divide this point's x & y coordinates by a factor,
-         * yielding a new point.
-         * @param {number} k factor
-         * @return {Point} output point
-         */
-        div(k) { return this.clone()._div(k); },
-
-        /**
-         * Rotate this point around the 0, 0 origin by an angle a,
-         * given in radians
-         * @param {number} a angle to rotate around, in radians
-         * @return {Point} output point
-         */
-        rotate(a) { return this.clone()._rotate(a); },
-
-        /**
-         * Rotate this point around p point by an angle a,
-         * given in radians
-         * @param {number} a angle to rotate around, in radians
-         * @param {Point} p Point to rotate around
-         * @return {Point} output point
-         */
-        rotateAround(a, p) { return this.clone()._rotateAround(a, p); },
-
-        /**
-         * Multiply this point by a 4x1 transformation matrix
-         * @param {[number, number, number, number]} m transformation matrix
-         * @return {Point} output point
-         */
-        matMult(m) { return this.clone()._matMult(m); },
-
-        /**
-         * Calculate this point but as a unit vector from 0, 0, meaning
-         * that the distance from the resulting point to the 0, 0
-         * coordinate will be equal to 1 and the angle from the resulting
-         * point to the 0, 0 coordinate will be the same as before.
-         * @return {Point} unit vector point
-         */
-        unit() { return this.clone()._unit(); },
-
-        /**
-         * Compute a perpendicular point, where the new y coordinate
-         * is the old x coordinate and the new x coordinate is the old y
-         * coordinate multiplied by -1
-         * @return {Point} perpendicular point
-         */
-        perp() { return this.clone()._perp(); },
-
-        /**
-         * Return a version of this point with the x & y coordinates
-         * rounded to integers.
-         * @return {Point} rounded point
-         */
-        round() { return this.clone()._round(); },
-
-        /**
-         * Return the magnitude of this point: this is the Euclidean
-         * distance from the 0, 0 coordinate to this point's x and y
-         * coordinates.
-         * @return {number} magnitude
-         */
-        mag() {
-            return Math.sqrt(this.x * this.x + this.y * this.y);
-        },
-
-        /**
-         * Judge whether this point is equal to another point, returning
-         * true or false.
-         * @param {Point} other the other point
-         * @return {boolean} whether the points are equal
-         */
-        equals(other) {
-            return this.x === other.x &&
-                   this.y === other.y;
-        },
-
-        /**
-         * Calculate the distance from this point to another point
-         * @param {Point} p the other point
-         * @return {number} distance
-         */
-        dist(p) {
-            return Math.sqrt(this.distSqr(p));
-        },
-
-        /**
-         * Calculate the distance from this point to another point,
-         * without the square root step. Useful if you're comparing
-         * relative distances.
-         * @param {Point} p the other point
-         * @return {number} distance
-         */
-        distSqr(p) {
-            const dx = p.x - this.x,
-                dy = p.y - this.y;
-            return dx * dx + dy * dy;
-        },
-
-        /**
-         * Get the angle from the 0, 0 coordinate to this point, in radians
-         * coordinates.
-         * @return {number} angle
-         */
-        angle() {
-            return Math.atan2(this.y, this.x);
-        },
-
-        /**
-         * Get the angle from this point to another point, in radians
-         * @param {Point} b the other point
-         * @return {number} angle
-         */
-        angleTo(b) {
-            return Math.atan2(this.y - b.y, this.x - b.x);
-        },
-
-        /**
-         * Get the angle between this point and another point, in radians
-         * @param {Point} b the other point
-         * @return {number} angle
-         */
-        angleWith(b) {
-            return this.angleWithSep(b.x, b.y);
-        },
-
-        /**
-         * Find the angle of the two vectors, solving the formula for
-         * the cross product a x b = |a||b|sin(θ) for θ.
-         * @param {number} x the x-coordinate
-         * @param {number} y the y-coordinate
-         * @return {number} the angle in radians
-         */
-        angleWithSep(x, y) {
-            return Math.atan2(
-                this.x * y - this.y * x,
-                this.x * x + this.y * y);
-        },
-
-        /** @param {[number, number, number, number]} m */
-        _matMult(m) {
-            const x = m[0] * this.x + m[1] * this.y,
-                y = m[2] * this.x + m[3] * this.y;
-            this.x = x;
-            this.y = y;
-            return this;
-        },
-
-        /** @param {Point} p */
-        _add(p) {
-            this.x += p.x;
-            this.y += p.y;
-            return this;
-        },
-
-        /** @param {Point} p */
-        _sub(p) {
-            this.x -= p.x;
-            this.y -= p.y;
-            return this;
-        },
-
-        /** @param {number} k */
-        _mult(k) {
-            this.x *= k;
-            this.y *= k;
-            return this;
-        },
-
-        /** @param {number} k */
-        _div(k) {
-            this.x /= k;
-            this.y /= k;
-            return this;
-        },
-
-        /** @param {Point} p */
-        _multByPoint(p) {
-            this.x *= p.x;
-            this.y *= p.y;
-            return this;
-        },
-
-        /** @param {Point} p */
-        _divByPoint(p) {
-            this.x /= p.x;
-            this.y /= p.y;
-            return this;
-        },
-
-        _unit() {
-            this._div(this.mag());
-            return this;
-        },
-
-        _perp() {
-            const y = this.y;
-            this.y = this.x;
-            this.x = -y;
-            return this;
-        },
-
-        /** @param {number} angle */
-        _rotate(angle) {
-            const cos = Math.cos(angle),
-                sin = Math.sin(angle),
-                x = cos * this.x - sin * this.y,
-                y = sin * this.x + cos * this.y;
-            this.x = x;
-            this.y = y;
-            return this;
-        },
-
-        /**
-         * @param {number} angle
-         * @param {Point} p
-         */
-        _rotateAround(angle, p) {
-            const cos = Math.cos(angle),
-                sin = Math.sin(angle),
-                x = p.x + cos * (this.x - p.x) - sin * (this.y - p.y),
-                y = p.y + sin * (this.x - p.x) + cos * (this.y - p.y);
-            this.x = x;
-            this.y = y;
-            return this;
-        },
-
-        _round() {
-            this.x = Math.round(this.x);
-            this.y = Math.round(this.y);
-            return this;
-        },
-
-        constructor: Point
-    };
-
-    /**
-     * Construct a point from an array if necessary, otherwise if the input
-     * is already a Point, return it unchanged.
-     * @param {Point | [number, number] | {x: number, y: number}} p input value
-     * @return {Point} constructed point.
-     * @example
-     * // this
-     * var point = Point.convert([0, 1]);
-     * // is equivalent to
-     * var point = new Point(0, 1);
-     */
-    Point.convert = function (p) {
-        if (p instanceof Point) {
-            return /** @type {Point} */ (p);
-        }
-        if (Array.isArray(p)) {
-            return new Point(+p[0], +p[1]);
-        }
-        if (p.x !== undefined && p.y !== undefined) {
-            return new Point(+p.x, +p.y);
-        }
-        throw new Error('Expected [x, y] or {x, y} point format');
-    };
-
     const defaultGetTile = (url, abortController) => __awaiter(undefined, undefined, undefined, function* () {
         const options = {
             signal: abortController.signal,
@@ -3294,7 +3460,9 @@
         }
         fetchDem(z, x, y, options, abortController, timer) {
             return __awaiter(this, undefined, undefined, function* () {
-                const zoom = Math.min(z - (options.overzoom || 0), this.maxzoom);
+                //const zoom = Math.min(z - (options.overzoom || 0), this.maxzoom);
+                const maxFetchZoom = options.maxFetchZoom || 22;
+                const zoom = Math.min(Math.min(z - (options.overzoom || 0), this.maxzoom), maxFetchZoom);
                 const subZ = z - zoom;
                 const div = 1 << subZ;
                 const newX = Math.floor(x / div);
@@ -3304,10 +3472,10 @@
             });
         }
         fetchContourTile(z, x, y, options, parentAbortController, timer) {
-            const { levels, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", levelKey = "level", subsampleBelow = 100, } = options;
+            const { levels, intervals, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", intervalKey = "intervalIndex", subsampleBelow = 100, } = options;
             // console.log(`FETCH options`, options)
             // no levels means less than min zoom with levels specified
-            if (!levels || levels.length === 0) {
+            if ((!intervals || intervals.length === 0) && (!levels || levels.length === 0)) {
                 return Promise.resolve({ arrayBuffer: new ArrayBuffer(0) });
             }
             const key = [z, x, y, encodeIndividualOptions(options)].join("/");
@@ -3339,57 +3507,42 @@
                     .averagePixelCentersToGrid()
                     .scaleElevation(multiplier)
                     .materialize(1);
-                // ISOPOLYS: define layers
-               
-                const isoOptions = options 
-                // {
-                //     levels: [ -300, 0,100, 400,1000],
+                // const isoOptions = {
+                //     levels: [ -300, 0, 400],
                 //     interval : 100, //levels[0]
-                //     polygons: true,
+                //     polygons: false,
                 //     deltaReference: 0,
-                // }
-
-                console.log("levelDef:",isoOptions.levelDef)
-                const geomType = (isoOptions.polygons) ? GeomType.POLYGON: GeomType.LINESTRING;
-
-                const isolines = generateIsolines( isoOptions, virtualTile, extent, buffer, x, y, z);
+                // } as IsoOptions;
+                const isolines = generateIsolines(options, virtualTile, extent, buffer, x, y, z);
+                const geomType = (options.polygons) ? GeomType.POLYGON : GeomType.LINESTRING;
+                // natural ordering will messe up ordering if negative levels are involved
+                const isoLinesKeysSorted = Object.keys(isolines).map(a => Number(a)).sort((a, b) => a - b);
                 mark === null || mark === undefined ? undefined : mark();
-
-
-                const isoLinesKeysSorted = Object.keys(isolines).map( a => Number(a)).sort( (a,b) => a-b)
-
                 const result = encodeVectorTile({
                     extent,
                     layers: {
                         [contourLayer]: {
-                            // features: Object.entries(isolines).map(([eleString, geom]) => {
-                            features: isoLinesKeysSorted.map( l => [l,isolines[l]] ).map(([eleString, geom]) => {
-
-                                const ele = Number(eleString);
-                                
-                                const baseProps = { 
-                                    [elevationKey]: ele, 
-                                    [levelKey]: Math.max(...levels.map((l, i) => (ele % l === 0 ? i : 0))) 
-                                }
-
+                            //features: Object.entries(isolines).map(([eleString, geom]) => {
+                            features: isoLinesKeysSorted.map(l => { return { ele: l, geom: isolines[l] }; }).map(({ ele, geom }) => {
+                                // const ele = Number(eleString);
+                                var _a;
+                                const baseProps = {
+                                    [elevationKey]: ele,
+                                    [intervalKey]: (intervals) ? Math.max(...intervals.map((l, i) => (ele % l === 0 ? i : 0))) : 0,
+                                };
                                 //ISOPOLYS: calc delta value and extend props
-                                const deltaAlt = (isoOptions.deltaReference!=undefined) ? ele - isoOptions.deltaReference : undefined ;
-                                const deltaProps = (deltaAlt!=undefined)? {
+                                const deltaAlt = (options.deltaReference != undefined) ? ele - options.deltaReference : undefined;
+                                const deltaProps = (deltaAlt != undefined) ? {
                                     delta: deltaAlt,
-                                }:{}
-
-
-
-                                const levelDef = isoOptions.levelDef?.find( e => Number(e.level)==ele )
-                                const levelProps = (levelDef)?levelDef.props:{}
-
-                                const properties = Object.assign( baseProps, deltaProps,levelProps)
-                                //console.log(properties)
-
+                                } : {};
+                                const levelDef = (_a = options.levelDef) === null || _a === undefined ? undefined : _a.find(e => Number(e.level) == ele);
+                                const levelProps = (levelDef) ? levelDef.props : {};
+                                const properties = Object.assign(baseProps, deltaProps, levelProps);
+                                // console.log(properties)
                                 return {
                                     type: geomType,
                                     geometry: geom,
-                                    properties,
+                                    properties: properties,
                                 };
                             }),
                         },
@@ -3651,15 +3804,12 @@
                 try {
                     const [z, x, y] = this.parseUrl(request.url);
                     const reqOptions = actor.a(request.url);
-                    //POLYLINES
-                    
+                    //POLYLINES      
                     let overrideOptions = null;
                     if (this.GetOptions) {
-                        overrideOptions = this.GetOptions({z,x,y});
+                        overrideOptions = this.GetOptions({ z, x, y });
                     }
-
-                    const options = Object.assign( {}, reqOptions, overrideOptions )
-
+                    const options = Object.assign({}, reqOptions, overrideOptions);
                     const data = yield this.manager.fetchContourTile(z, x, y, actor.g(options, z), abortController, timer);
                     timing = timer.finish(request.url);
                     return { data: data.arrayBuffer };

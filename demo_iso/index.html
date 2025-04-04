@@ -6,8 +6,9 @@
   <title>Display a map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
-  <script src="../dist/index.js"></script>
+  <script src="../demo_iso/index.js"></script>
   <script src="../demo_gpws/gpws.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     body {
@@ -105,10 +106,8 @@
   </div>
   <script>
 
-    const TILESERVER_AWS = "https://elevation-tiles-prod.s3.amazonaws.com/terrarium"
-    const TILESERVER_LOCAL_SEATTLE = "http://localhost:8080/services/seattle-mz/tiles/"
-
-    const demTileServerBaseUrl = TILESERVER_AWS;
+    
+    const demTileServerBaseUrl = getLocalTileServerUrl("seattle-mz");
 
     const demSource = new mlcontour.DemSource({
       url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
@@ -123,8 +122,10 @@
     // calls maplibregl.addProtocol for the shared cache and contour protocols
     demSource.setupMaplibre(maplibregl);
 
-    let SelectedGPWSAltitude = 200;
-    demSource.GetOptions = (tileCoords) => {
+    const SEATTLE = [-122, 47.92731];
+
+    let SelectedGPWSAltitude = 1606;
+    demSource.GetOptions_ = (tileCoords) => {
 
       const gpwsLevels = createGpwsLevel(SelectedGPWSAltitude);
       // console.log(gpwsLevels.map( e => e.level))
@@ -133,7 +134,7 @@
         levels: gpwsLevels.map(e => e.level), //[ -300, 0,100, 400],
         levelDef: gpwsLevels,
         //intervals : [100], //levels[0]
-        polygons: true,
+        polygons: false,
         deltaReference: SelectedGPWSAltitude, //400,
       }
       return config;
@@ -163,7 +164,7 @@
                 // meters to feet
                 multiplier: 3.28084,
                 overzoom: 1,
-                min: -100,
+                //min: -100,
                 thresholds: {
                   // zoom: [minor, major]
                   3: [2000, 2000],
@@ -175,7 +176,7 @@
                 elevationKey: 'ele',
                 levelKey: 'level',
                 contourLayer: 'contours',
-                subsampleBelow: 10,
+                //subsampleBelow: 10,
 
               })
             ],
@@ -190,10 +191,10 @@
             type: "hillshade",
             source: "dem",
             paint: {
-              "hillshade-exaggeration": 0.25,
+              "hillshade-exaggeration": 1,
             },
             layout: {
-              visibility: "none",
+              // visibility: "none",
             }
           },
           {
@@ -202,7 +203,7 @@
             source: "contourSourceFeet",
             "source-layer": "contours",
             paint: {
-              "line-color": "rgba(0,0,0, 50%)",
+              "line-color": "rgba(255,0,0, 100%)",
               "line-width": ["match", ["get", "level"], 1, 1, 0.5],
             },
             layout: {
@@ -211,7 +212,7 @@
           },
 
 
-
+          
 
 
           {
@@ -233,8 +234,8 @@
                 //['number-format', ['get', 'ele'], {}],
                 ['number-format', ['get', 'ele'], {}],
                 '\'', ' [',
-                ['number-format', ['get', 'delta'], {}],
-                '\'', ']',
+                //['number-format', ['get', 'delta'], {}],
+                //'\'', ']',
               ],
               //'text-font': ['Noto Sans Bold']
             }
@@ -249,10 +250,49 @@
 
 
 
-    map.on('load', async () => {
+    map.on('load', () => {
+        // Generate a polygon using turf.circle
+        // See https://turfjs.org/docs/#circle
+        const radius = 1500; // kilometer
+        const options = {
+            steps: 64,
+            units: 'nauticalmiles'
+        };
+        const circle = turf.circle(SEATTLE, radius, options);
+        const circleInnner = turf.circle(SEATTLE, 320, options);
 
+        circle.geometry.coordinates[1] = circleInnner.geometry.coordinates[0]
 
-    })
+        console.log(circle)
+
+        // // Add the circle as a GeoJSON source
+        // map.addSource('location-radius', {
+        //     type: 'geojson',
+        //     data: circle
+        // });
+
+        // // Add a fill layer with some transparency
+        // map.addLayer({
+        //     id: 'location-radius',
+        //     type: 'fill',
+        //     source: 'location-radius',
+        //     paint: {
+        //         'fill-color': '#8CCFFF',
+        //         'fill-opacity': 1.0
+        //     }
+        // });
+
+        // // Add a line layer to draw the circle outline
+        // map.addLayer({
+        //     id: 'location-radius-outline',
+        //     type: 'line',
+        //     source: 'location-radius',
+        //     paint: {
+        //         'line-color': '#0094ff',
+        //         'line-width': 3
+        //     }
+        // });
+    });
 
     const selectGPWS = document.getElementById('layer');
     selectGPWS.addEventListener("change", function ($e) {
