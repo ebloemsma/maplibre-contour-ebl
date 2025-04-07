@@ -1120,6 +1120,7 @@
         if (!lines || lines.length < 1)
             return [];
         const newLines = [];
+        const dbg = `${0}`;
         const minXY = tileInfo.minXY;
         const maxXY = tileInfo.maxXY;
         if (minXY == undefined || maxXY == undefined)
@@ -1140,12 +1141,18 @@
             // stop if first line is reached again
             if ((i > 1 && firstline == line) || i > 50) {
                 line = null;
+                if (dbg)
+                    console.log("=== END : reached first again", i);
                 break;
             }
             if (i > initLineCount) {
                 line = null;
+                if (dbg)
+                    console.log("=== END : initial line count reached", i);
                 break;
             }
+            if (dbg)
+                console.log("LINE " + i, line);
             let appendingLines = [];
             let nextAppendLine = line;
             // look for all lines with edge contact in clockwise
@@ -1161,8 +1168,12 @@
                 }
                 const nextIsSame = line.isIdentical(nextLine);
                 if (nextIsSame) {
+                    if (dbg)
+                        console.log("appendLoop: End self reached, count:", appendingLines.length);
                     break;
                 }
+                if (dbg)
+                    console.log("appendLoop: testing line", nextLine);
                 if (nextLine)
                     appendingLines.push(nextLine);
                 nextAppendLine = nextLine;
@@ -1178,13 +1189,46 @@
             if (l.line)
                 newLines.push(l.line);
         });
-        lineIndex.inner.forEach(l => {
-            // console.log(l.line)
-            if (l.line)
-                newLines.push(l.line);
-        });
+        const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
+        const innerOnlyClockwise = lineIndex.inner.every(l => l.winding == "cw");
+        try {
+            // handles special - closed inner polys, with LOWER terrain, must be holes in full tile
+            if (innerOnlyClockwise) {
+                if (dbg == "1")
+                    console.log("inner only clockwise holes: ", lineIndex.inner, { final: lineIndex.finalPool.length > 0 });
+                // these cases are not handled correctly, must be holes in other polygons
+                if (lineIndex.finalPool.length > 0)
+                    throw new Error("error: inner Clockwise polys + non-inner polys (final)");
+                if (lineIndex.remainCount > 0)
+                    throw new Error("error: inner Clockwise polys + remainCount: " + lineIndex.remainCount);
+                const innerLines = lineIndex.inner.filter(l => l.line).map(l => l.line);
+                // add as holes to full tile poly
+                newLines.push(fullTileCCW, ...innerLines);
+                lineIndex.inner = [];
+            }
+        }
+        catch (e) {
+            console.log(e);
+        }
+        const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+        // add inner holes with HIGH terrain
+        if (innerHighPolygons.length > 0) {
+            if (dbg == "1")
+                console.log("inner HIGH polys: ", innerHighPolygons);
+            innerHighPolygons.forEach(l => {
+                // newLines.push(l.line);
+            });
+            lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
+        }
         const rem = lineIndex.getRemaining();
-        if (rem.length) ;
+        if (rem.length) {
+            if (dbg)
+                console.log("REMaining: ", rem.length);
+        }
+        else {
+            if (dbg)
+                console.log("REM empty ");
+        }
         rem.forEach(l => {
             // console.log(l.line)
             if (l.line)
@@ -1201,6 +1245,8 @@
             // console.log(line)
             // newLines.push( line );
         }
+        if (dbg)
+            console.log("===============", lineIndex);
         return newLines;
     }
 
