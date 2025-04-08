@@ -599,6 +599,7 @@
             this.update(minXY, maxXY);
         }
         toString() {
+            
             var _a;
             const l = this;
             if (l.isClosed) {
