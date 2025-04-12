@@ -639,14 +639,24 @@
             this.update(minXY, maxXY);
         }
         toString() {
-            var _a;
-            const l = this;
-            if (l.isClosed) {
-                return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
-            }
-            return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
+            return this.toString2();
         }
         ;
+        toString2(tileLineIndex) {
+            const l = this;
+            const winding = (l.winding) ? l.winding : "";
+            const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
+            const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
+            const tiny = (l.isTiny) ? "tiny," : "";
+            const length = (l.line) ? "l:" + l.line.length + "," : "";
+            const area = (l.isClosed) ? `area:${l.info.area},` : "";
+            const bbox = (l.bbox) ? `bbx: [${l.bbox.minX},${l.bbox.minY} - ${l.bbox.maxX},${l.bbox.maxY}],` : "";
+            let selfClosable = (tileLineIndex === null || tileLineIndex === undefined ? undefined : tileLineIndex.lineIsSelfClosable(l)) ? "selfClosable" : "";
+            if (l.isClosed) {
+                return `#${l.hash} ${closed} ${length} ${area} ${bbox} ${tiny}`;
+            }
+            return `#${l.hash} ${length} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}--${l.end.x},${l.end.y}] ${selfClosable} ${bbox}`;
+        }
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
@@ -880,15 +890,7 @@
                 inner: [],
             };
             const lineToString = (l) => {
-                const winding = (l.winding) ? l.winding : "";
-                const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
-                const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
-                const tiny = (l.isTiny) ? "tiny," : "";
-                let selfClosable = (this.lineIsSelfClosable(l)) ? "selfClosable" : "";
-                if (l.isClosed) {
-                    return `#${l.hash} ${closed} ${tiny} area:${l.area} `;
-                }
-                return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y} - ${l.end.x},${l.end.y} ${selfClosable}]`;
+                return l.toString2();
             };
             for (const [edge, node] of Object.entries(lineIndex)) {
                 //console.log( edge, node)
