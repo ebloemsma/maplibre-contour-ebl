@@ -15,6 +15,8 @@ const gpwsLevelsCfg = [
 ]
 function createGpwsLevel(refAltitude, levelCfg) {
 
+    const lowCutOutElevation = 30;
+
     const useCfg = (levelCfg || gpwsPatterns)
     const gpwsLevels = Object.keys(useCfg).map(k => Number(k)).sort((a, b) => b - a).map(rl => [rl, rl + refAltitude])
 
@@ -31,10 +33,10 @@ function createGpwsLevel(refAltitude, levelCfg) {
 
             }
         }
-        if (ele > 0) {
+        if (ele > lowCutOutElevation) {
             result.push(value);
         } else if (!firstNegativeIncluded) {
-            result.push(Object.assign(value, { level: 0 }));
+            result.push(Object.assign(value, { level: lowCutOutElevation }));
             firstNegativeIncluded = true;
         }
     }
@@ -48,7 +50,7 @@ const simpleLevels = [
 ]
 
 const setPolygons = Vue.ref(false)
-const setAlt = Vue.ref(0)
+const setAlt = Vue.ref(30)
 
 function GetOptionsOne(){
 

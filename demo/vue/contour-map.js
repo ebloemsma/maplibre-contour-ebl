@@ -18,6 +18,7 @@ const initialState = initTile11_328_713
 class CountourMao extends maplibregl.Map {
     constructor() {
         const options = {
+            hash: true,
             showTileBoundaries: true,
             container: 'map',
             //style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
