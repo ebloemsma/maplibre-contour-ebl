@@ -734,7 +734,7 @@
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
         getHoleCandidates() {
-            return this.inner.filter(l => l.winding == "cw").filter(l => l.isTiny);
+            return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny);
         }
         constructor(lines, minXY, maxXY) {
             //finalPool: TiledLine[] = [];
