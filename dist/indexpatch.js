@@ -1247,21 +1247,22 @@
         }
         if (dbg >= 1)
             console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+        // array will be mutated, when holes are contained in another polygon
+        const holeCandidates = [...innerLowPolygonsCW].filter(l => !l.isTiny);
         // find any holes (inner polys with low terrain inside)
         concatedPolygonsArray.forEach(concatPoly => {
             // console.log(l.line)
             if (!concatPoly.line)
                 return;
-            const checkInnerLowPolys = [...innerLowPolygonsCW];
+            const currentHoleCandidates = [...holeCandidates];
             if (dbg >= 1)
-                console.log(`- find poly holes(inner-low):${checkInnerLowPolys} concatPoly:`, concatPoly.toString2());
+                console.log(`- find poly holes(inner-low):${currentHoleCandidates.length} concatPoly:`, concatPoly.toString2(), currentHoleCandidates);
             const foundHoles = [];
-            checkInnerLowPolys.forEach(inner => {
-                if (inner.isTiny) {
-                    if (dbg >= 1)
-                        console.log(`  - skip hole (tiny): ${inner.toString2()}`);
-                    return;
-                }
+            currentHoleCandidates.forEach(inner => {
+                // if (inner.isTiny) {
+                //     if (dbg >= 1) console.log(`  - skip hole (tiny): ${inner.toString2()}`)
+                //     return;
+                // }
                 const isInseide = isPolygonInsideFlat(inner.line, concatPoly.line);
                 if (isInseide) {
                     foundHoles.push(inner);
@@ -1270,10 +1271,10 @@
                 }
             });
             if (dbg >= 1)
-                console.log(` - finalize poly, add holes: ${foundHoles.length}`);
+                console.log(` - finalize poly, holes: ${foundHoles.length}`);
             newLines.push(concatPoly.line, ...foundHoles.map(l => l.line).filter(l => l != undefined));
-            const removed = arrayRemoveObjects(innerLowPolygonsCW, ...foundHoles);
-            console.log("## removed inner:" + removed);
+            arrayRemoveObjects(holeCandidates, ...foundHoles);
+            // if (dbg >= 2) console.log("removed hole candidates:" + removed )
         });
         const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
         // handle inner self-closed lines (rings/polygons) that never touched edges
@@ -1367,9 +1368,13 @@
         return lines.map(l => l.toString());
     }
     function arrayRemoveObjects(theArray, ...removeObjects) {
+        if (!removeObjects)
+            return 0;
         return removeObjects.map(o => arrayRemoveObject(theArray, o)).filter(r => r === true).length;
     }
     function arrayRemoveObject(theArray, removeObject) {
+        if (!removeObject)
+            return false;
         let index = theArray.indexOf(removeObject);
         if (index !== -1) {
             theArray.splice(index, 1);
