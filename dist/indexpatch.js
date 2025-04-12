@@ -1255,7 +1255,7 @@
             if (!concatPoly.line)
                 return;
             const currentHoleCandidates = [...holeCandidates];
-            if (dbg >= 1)
+            if (dbg >= 1 && currentHoleCandidates.length > 0)
                 console.log(`- find poly holes(inner-low):${currentHoleCandidates.length} concatPoly:`, concatPoly.toString2(), currentHoleCandidates);
             const foundHoles = [];
             currentHoleCandidates.forEach(inner => {
