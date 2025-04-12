@@ -1245,17 +1245,36 @@
             linesToAppend.forEach(l => lineIndex.removeFromSearch(l));
             currentEdgeLine = lineIndex.getFirst();
         }
-        console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
-        concatedPolygonsArray.forEach(l => {
+        if (dbg >= 1)
+            console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+        // find any holes (inner polys with low terrain inside)
+        concatedPolygonsArray.forEach(concatPoly => {
             // console.log(l.line)
-            if (l.line) {
-                testPolyContainsInner(l, innerLowPolygonsCW);
-                newLines.push(l.line);
-            }
+            if (!concatPoly.line)
+                return;
+            const checkInnerLowPolys = [...innerLowPolygonsCW];
+            if (dbg >= 1)
+                console.log(`- find poly holes(inner-low):${checkInnerLowPolys} concatPoly:`, concatPoly.toString2());
+            const foundHoles = [];
+            checkInnerLowPolys.forEach(inner => {
+                if (inner.isTiny) {
+                    if (dbg >= 1)
+                        console.log(`  - skip hole (tiny): ${inner.toString2()}`);
+                    return;
+                }
+                const isInseide = isPolygonInsideFlat(inner.line, concatPoly.line);
+                if (isInseide) {
+                    foundHoles.push(inner);
+                    if (dbg >= 1)
+                        console.log(`  - found hole: ${inner.toString2()}`);
+                }
+            });
+            if (dbg >= 1)
+                console.log(` - finalize poly, add holes: ${foundHoles.length}`);
+            newLines.push(concatPoly.line, ...foundHoles.map(l => l.line).filter(l => l != undefined));
+            const removed = arrayRemoveObjects(innerLowPolygonsCW, ...foundHoles);
+            console.log("## removed inner:" + removed);
         });
-        if ((dbg >= 1) && lineIndex.inner.length > 0) {
-            console.log("innerPolys: ", lineIndex.inner);
-        }
         const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
         // handle inner self-closed lines (rings/polygons) that never touched edges
         // depending on winding they denote higher or lower terrain
@@ -1322,13 +1341,6 @@
         //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
         return newLines;
     }
-    function testPolyContainsInner(poly, innerPolys) {
-        console.log("- testPolyInner:", poly.toString2());
-        innerPolys.forEach(inner => {
-            const isInseide = isPolygonInsideFlat(inner.line, poly.line);
-            console.log(`  - ${isInseide} <- ${inner.toString2()}`);
-        });
-    }
     function pointInPolygonFlat(px, py, polygon) {
         let inside = false;
         const len = polygon.length;
@@ -1353,6 +1365,17 @@
     }
     function lineArrayToStrings(lines) {
         return lines.map(l => l.toString());
+    }
+    function arrayRemoveObjects(theArray, ...removeObjects) {
+        return removeObjects.map(o => arrayRemoveObject(theArray, o)).filter(r => r === true).length;
+    }
+    function arrayRemoveObject(theArray, removeObject) {
+        let index = theArray.indexOf(removeObject);
+        if (index !== -1) {
+            theArray.splice(index, 1);
+            return true;
+        }
+        return false;
     }
 
     /*
