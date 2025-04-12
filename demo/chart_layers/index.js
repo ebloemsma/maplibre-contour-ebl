@@ -373,8 +373,99 @@
             if (tile)
                 this.setTile(tile);
         }
+        /**
+         * checks tile against this coordinates
+         * if coordinate is null this coordinate is not checked
+         *
+         * @param z
+         * @param x
+         * @param y
+         * @returns
+         */
+        isTile(z, x, y) {
+            const isZ = (z !== null) ? this.z == z : true;
+            const isY = (y !== null) ? this.y == y : true;
+            const isX = (x !== null) ? this.x == x : true;
+            return (isZ && isX && isY);
+        }
         toString() {
-            return `TileInfo: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  edgemin/max: ${this.edgeMin}/${this.edgeMax}`; //min/maxXY: ${this.minXY},${this.maxXY} `
+            return `Tile: ${this.z}/${this.x}/${this.y}, min/max: ${Math.round(this.min || 0)}/${Math.round(this.max || 0)}  edgemin/max: ${this.edgeMin}/${this.edgeMax}`; //min/maxXY: ${this.minXY},${this.maxXY} `
+        }
+        coordString() {
+            return `Tile: ${this.z}/${this.x}/${this.y}`;
+        }
+    }
+    class TileEdgeLineIndex {
+        static __createFromLines(lines, minXY, maxXY) {
+            const lineObjects = lines.map(l => {
+                return new TiledLine(l, minXY, maxXY);
+            });
+            return TileEdgeLineIndex.__createFromTileLines(lineObjects, minXY, maxXY);
+        }
+        static __createFromTileLines(lineObjectsAll, minXY, maxXY) {
+            // const lineObjects = lines.map(l => {
+            //     return new TiledLine(l, minXY, maxXY);
+            // });
+            // console.log( inner )
+            const lineObjects = lineObjectsAll.filter(l => (!l.isClosed && !l.isTiny));
+            const topStart = lineObjects.filter(lo => lo.brd.start == 1).sort((a, b) => {
+                return (a.start.x - b.start.x);
+            });
+            const rightStart = lineObjects.filter(lo => lo.brd.start == 2).sort((a, b) => {
+                return (a.start.y - b.start.y);
+            });
+            // x von groß zu klein
+            const bottomStart = lineObjects.filter(lo => lo.brd.start == 4).sort((a, b) => {
+                return (b.start.x - a.start.x);
+            });
+            //von oben nach unten
+            const leftStart = lineObjects.filter(lo => lo.brd.start == 8).sort((a, b) => {
+                return (b.start.y - a.start.y);
+            });
+            //------
+            const topEnd = lineObjects.filter(lo => lo.brd.end == 1).sort((a, b) => {
+                return (a.end.x - b.end.x);
+            });
+            const rightEnd = lineObjects.filter(lo => lo.brd.end == 2).sort((a, b) => {
+                return (a.end.y - b.end.y);
+            });
+            // x von groß zu klein
+            const bottomEnd = lineObjects.filter(lo => lo.brd.end == 4).sort((a, b) => {
+                return (b.end.x - a.end.x);
+            });
+            //von oben nach unten
+            const leftEnd = lineObjects.filter(lo => lo.brd.end == 8).sort((a, b) => {
+                return (b.end.y - a.end.y);
+            });
+            const index = new TileEdgeLineIndex();
+            const data = {
+                1: {
+                    s: topStart,
+                    e: topEnd,
+                },
+                2: {
+                    s: rightStart,
+                    e: rightEnd,
+                },
+                4: {
+                    s: bottomStart,
+                    e: bottomEnd,
+                },
+                8: {
+                    s: leftStart,
+                    e: leftEnd,
+                }
+            };
+            return Object.assign(index, data);
+        }
+        removeLine(line) {
+            if (!line)
+                return;
+            for (const [edge, node] of Object.entries(this)) {
+                //console.log( edge, node)
+                node.s = node.s.filter(l => l !== line);
+                node.e = node.e.filter(l => l !== line);
+            }
         }
     }
     function findBorder(x, y, minXY, maxXY) {
@@ -415,6 +506,27 @@
     }
     function getLineFirst(line) {
         return { x: line[0], y: line[1] };
+    }
+    function getLineBBox(line) {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        const numPoints = line.length / 2;
+        for (let i = 0; i < numPoints; i++) {
+            const x1 = line[2 * i];
+            const y1 = line[2 * i + 1];
+            maxX = Math.max(maxX, x1);
+            maxY = Math.max(maxY, y1);
+            minX = Math.min(minX, x1);
+            minY = Math.min(minY, y1);
+        }
+        return {
+            minX,
+            minY,
+            maxX,
+            maxY
+        };
     }
     function getLineBorderCode(line, minXY, maxXY) {
         if (!line)
@@ -535,6 +647,7 @@
             this.brd = border;
             // cw : inner lower
             // ccw: inner is higher
+            this.bbox = getLineBBox(l);
             if (this.isClosed) {
                 const polyInfo = analyzePolygon(this.line);
                 this.info = polyInfo;
@@ -599,36 +712,40 @@
             this.update(minXY, maxXY);
         }
         toString() {
-            
-            var _a;
-            const l = this;
-            if (l.isClosed) {
-                return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
-            }
-            return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${(_a = l.line) === null || _a === undefined ? undefined : _a.length} `;
+            return this.toString2();
         }
-
-        toString2 () {
-            const l = this;
-
-            if (l.isClosed) {
-                return `#${l.hash} closed,${l.isTiny?"tiny":""} area:${l.signedArea} wdng:${l.winding} pts:${l.line.length}`;
-            }
-
-            return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}]`;
-        };
-
         ;
+        toString2(tileLineIndex) {
+            const l = this;
+            const winding = (l.winding) ? l.winding : "";
+            const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
+            const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
+            const tiny = (l.isTiny) ? "tiny," : "";
+            const length = (l.line) ? "l:" + l.line.length + "," : "";
+            const area = (l.isClosed) ? `area:${l.info.area},` : "";
+            const bbox = (l.bbox) ? `bbx: [${l.bbox.minX},${l.bbox.minY} - ${l.bbox.maxX},${l.bbox.maxY}],` : "";
+            let selfClosable = (tileLineIndex === null || tileLineIndex === undefined ? undefined : tileLineIndex.lineIsSelfClosable(l)) ? "selfClosable" : "";
+            if (l.isClosed) {
+                return `#${l.hash} ${closed} ${length} ${area} ${bbox} ${tiny}`;
+            }
+            return `#${l.hash} ${length} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}--${l.end.x},${l.end.y}] ${selfClosable} ${bbox}`;
+        }
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
+        getHoleCandidates() {
+            return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny);
+        }
+        getTopCandidates() {
+            return this.inner.filter(l => l.winding == "ccw").filter(l => !l.isTiny);
+        }
         constructor(lines, minXY, maxXY) {
-            this.finalPool = [];
+            //finalPool: TiledLine[] = [];
             this.filtered = [];
             this.inner = [];
             this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
             this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
-            this.finalPool = [];
+            //this.finalPool = [];
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
@@ -711,7 +828,7 @@
             const leftEnd = lineObjects.filter(lo => lo.brd.end == 8).sort((a, b) => {
                 return (b.end.y - a.end.y);
             });
-            return {
+            const indexData = {
                 1: {
                     s: topStart,
                     e: topEnd,
@@ -729,6 +846,7 @@
                     e: leftEnd,
                 }
             };
+            return Object.assign(new TileEdgeLineIndex(), indexData);
         }
         findNext(line) {
             const point = line.end;
@@ -816,6 +934,8 @@
         }
         static getEdgeLisFromIndex(db, edge, startOrEnd) {
             const list = db[edge];
+            if (!list)
+                throw new Error("edgeIndex is null for edge: " + edge);
             if (!startOrEnd)
                 throw new Error("start or end missing"); //return list;
             if (startOrEnd == "start")
@@ -834,10 +954,10 @@
                 return list.e;
             throw new Error("get: invalid startOrEnd: " + startOrEnd);
         }
-        addToFinal(line) {
-            this.finalPool.push(line);
-            // console.log( "FINAL add:",line ) 
-        }
+        // addToFinal(line: TiledLine) {
+        //     this.finalPool.push(line)
+        //     // console.log( "FINAL add:",line ) 
+        // }
         debugIndexOrig() {
             return this.debugIndexDB(this.origIndex);
         }
@@ -849,51 +969,55 @@
                 all: [],
                 inner: [],
             };
-            const toString = (l) => {
-                if (l.isClosed) {
-                    return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `;
-                }
-                let closable = (this.lineIsClosable(l)) ? "closable" : "";
-                return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] ${closable}`;
+            const lineToString = (l) => {
+                return l.toString2();
             };
             for (const [edge, node] of Object.entries(lineIndex)) {
                 //console.log( edge, node)
                 debug[edge] = {};
-                debug[edge].s = node.s.map(l => toString(l));
-                debug[edge].e = node.e.map(l => toString(l));
+                debug[edge].s = node.s.map(l => lineToString(l));
+                debug[edge].e = node.e.map(l => lineToString(l));
             }
             for (const line of this.lineIndexFlatList(lineIndex)) {
-                debug.all.push(toString(line));
+                debug.all.push(lineToString(line));
             }
             for (const line of this.inner) {
-                debug.inner.push(toString(line));
+                debug.inner.push(lineToString(line));
             }
             return debug;
         }
         removeFromSearch(line) {
-            //  console.log( "REMOVE:",line )
-            // console.log(this.debugIndex())
-            for (const [edge, node] of Object.entries(this.lineIndex)) {
-                //console.log( edge, node)
-                node.s = node.s.filter(l => l !== line);
-                node.e = node.e.filter(l => l !== line);
+            if (Array.isArray(line)) {
+                line.forEach(l => this.removeFromSearch(l));
+                return;
             }
-            // console.log(this.debugIndex())
-            // console.log(this.lineIndex)
+            //  console.log( "REMOVE:",line )
+            this.lineIndex.removeLine(line);
+            this.inner = this.inner.filter(l => l !== line);
+            // for (const [edge, node] of Object.entries(this.lineIndex)) {
+            //     //console.log( edge, node)
+            //     node.s = node.s.filter(l => l !== line)
+            //     node.e = node.e.filter(l => l !== line)
+            // }
         }
-        /** check if line is closable by adding tile corners,
+        /** check if line is closable with itself by adding tile corners,
          * so that no other lines ar found along the tile edges
          **/
-        lineIsClosable(line) {
+        lineIsSelfClosable(line) {
             //throw new Error("Disabled lineIsClosable")
             if (!line)
                 return false;
             const point = line.start;
             const edge = line.brd.start;
+            // no edge found so line is closed
+            if (line.isClosed)
+                return false;
+            if (!edge)
+                return false;
             let nextLine = LineIndex.findNextEdgeLine(this.origIndex, point, edge, "end");
             const isSame = (line.isIdentical(nextLine));
             // let nextLine = this.findNextStartEnd(line )
-            // console.log("lineIsClosable? ",isSame, line,nextLine)
+            // console.log("lineIsSelfClosable? ",isSame, line,nextLine)
             return isSame;
         }
         /**
@@ -1087,7 +1211,7 @@
             // add the start point at end
             return line;
         }
-        appendLinesToClone(lineIn, buffer, minXY, maxXY) {
+        createConcatedLine(lineIn, buffer, minXY, maxXY) {
             const dbg = `${0}`;
             const bufferRev = [...buffer].reverse();
             const line = lineIn.clone();
@@ -1128,122 +1252,174 @@
      * @returns
      */
     function convertTileIsolinesToPolygons(lvl, lines, tileInfo) {
-        var _a;
         if (!lines || lines.length < 1)
             return [];
         const newLines = [];
-        const dbg = `${1}`;
+        const concatedPolygonsArray = [];
+        // SET-DBG convertTileIsolinesToPolygons 
+        const dbg = Number(`${tileInfo.isTile(null, 328, 713) ? "1" : "0"}`);
+        //const dbg = Number(`${0}`);
+        if (dbg >= 1)
+            console.log(`convertIsoToPolys START - Tile: ${tileInfo.coordString()} `);
         const minXY = tileInfo.minXY;
         const maxXY = tileInfo.maxXY;
         if (minXY == undefined || maxXY == undefined)
             throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
-    
         const lineIndex = new LineIndex(lines, minXY, maxXY);
-        if(dbg=="1") console.log( `linesToPolys level: ${lvl} index:`, lineIndex.debugIndexOrig() ) 
-
-        const initLineCount = lineIndex.getRemaining().length;
-        const firstline = lineIndex.getFirst();
-        let line = firstline;
-        ((_a = line === null || line === undefined ? undefined : line.brd) === null || _a === undefined ? undefined : _a.start) || false;
-        let i = -1;
-        //----
-        // iterate over all lines in the tile.
+        //const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+        //const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
+        // console.log( "INDEX",lineIndex.debugIndex() ) 
+        // console.log( "INDEX Orig",lineIndex.debugIndexOrig() ) 
+        if (dbg >= 1)
+            console.log(`- lvl: ${lvl}, lines:`, lineIndex.debugIndexOrig());
+        // iterate over all edge-lines in the tile.
         // not all lines will end up here because they me be appended to other lines and removed from the list
-        while (line) {
+        const totalEdgeLineCount = lineIndex.getRemaining().length;
+        const firstline = lineIndex.getFirst();
+        let i = -1;
+        let currentEdgeLine = firstline;
+        while (currentEdgeLine) {
             i++;
             // stop if first line is reached again
-            if ((i > 1 && firstline == line) || i > 50) {
-                line = null;
-                if (dbg)
-                    console.log("=== END : reached first again", i);
+            if ((i > 1 && firstline == currentEdgeLine) || i > 50) {
+                currentEdgeLine = null;
+                if (dbg >= 2)
+                    console.log(`close line(${i} END - reached first again`);
                 break;
             }
-            if (i > initLineCount) {
-                line = null;
-                if (dbg)
-                    console.log("=== END : initial line count reached", i);
+            if (i > totalEdgeLineCount) {
+                currentEdgeLine = null;
+                if (dbg >= 2)
+                    console.log(`close line(${i} END - line count reached`);
                 break;
             }
-            if (dbg)
-                console.log(`test line ${i} ` , line.toString2() );
-            let appendingLines = [];
-            let nextAppendLine = line;
-            // look for all lines with edge contact in clockwise
-            for (let appendLoopCount = 0; appendLoopCount < initLineCount; appendLoopCount++) {
+            if (dbg >= 2)
+                console.log(`close Line (${i}) START`, currentEdgeLine);
+            let linesToAppend = [];
+            let currentAppendCandidateLine = currentEdgeLine;
+            // look for all other edge-lines in clockwise direction if they may be concat to currentLines
+            for (let appendLoopCount = 0; appendLoopCount < totalEdgeLineCount; appendLoopCount++) {
                 //if (appendLoopCount == initLineCount-1) {
                 //console.log("WARN: appendLoop has reached init line count");
                 //}
                 //the next line which end is on the edge can be appended
-                let nextLine = lineIndex.findNext2(nextAppendLine.start, nextAppendLine.brd.start, "end");
-                if (!nextLine) {
-                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { line, nextAppendLine });
+                let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
+                if (!nextAppendCandidate) {
+                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
                     break;
                 }
-                const nextIsSame = line.isIdentical(nextLine);
+                const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate);
                 if (nextIsSame) {
-                    if (dbg)
-                        console.log("appendLoop: End self reached, count:", appendingLines.length);
+                    if (dbg >= 2)
+                        console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
                     break;
                 }
-                if (dbg)
-                    console.log("appendLoop: testing line", nextLine);
-                if (nextLine)
-                    appendingLines.push(nextLine);
-                nextAppendLine = nextLine;
+                if (nextAppendCandidate) {
+                    if (dbg >= 2)
+                        console.log(`close line(${i} - append line:`, nextAppendCandidate);
+                    linesToAppend.push(nextAppendCandidate);
+                }
+                currentAppendCandidateLine = nextAppendCandidate;
             }
-            const newLine = lineIndex.appendLinesToClone(line, appendingLines, minXY, maxXY);
-            lineIndex.addToFinal(newLine);
-            lineIndex.removeFromSearch(line);
-            appendingLines.forEach(l => lineIndex.removeFromSearch(l));
-            line = lineIndex.getFirst();
+            const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
+            concatedPolygonsArray.push(concatedLine);
+            //lineIndex.addToFinal(concatedLine)
+            lineIndex.removeFromSearch(currentEdgeLine);
+            linesToAppend.forEach(l => lineIndex.removeFromSearch(l));
+            currentEdgeLine = lineIndex.getFirst();
         }
-        lineIndex.finalPool.forEach(l => {
+        if (dbg >= 1)
+            console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+        if (dbg >= 1)
+            console.log("- lineIndex (should have noe egde lines): ", lineIndex.debugIndex());
+        // handle inner self-closed lines (rings/polygons) that never touched edges
+        // depending on winding they denote higher or lower terrain
+        // ccw: denotes higher terrain - can just be added as polygons
+        // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
+        //     polygons created by appending ot maybe a fulltile polygon
+        // all polygons that may contain inner holes
+        const highPolys = [...concatedPolygonsArray, ...lineIndex.getTopCandidates()];
+        // process concated polygons and possible holes
+        highPolys.forEach(concatPoly => {
             // console.log(l.line)
-            if (l.line)
-                newLines.push(l.line);
+            if (!concatPoly.line)
+                return;
+            // find any holes (inner polys with low terrain inside)
+            const currentHoleCandidates = lineIndex.getHoleCandidates();
+            if (dbg >= 1 && currentHoleCandidates.length > 0)
+                console.log(`- find holes(inner-low):${currentHoleCandidates.length} in high-poly:`, concatPoly.toString2(), currentHoleCandidates);
+            const foundHoles = [];
+            currentHoleCandidates.forEach(inner => {
+                // if (inner.isTiny) {
+                //     if (dbg >= 1) console.log(`  - skip hole (tiny): ${inner.toString2()}`)
+                //     return;
+                // }
+                const isInseide = isPolygonInsideFlat(inner.line, concatPoly.line);
+                if (isInseide) {
+                    foundHoles.push(inner);
+                    if (dbg >= 1)
+                        console.log(`  - found hole: ${inner.toString2()}`);
+                }
+            });
+            if (dbg >= 1)
+                console.log(` - finalize poly, holes: ${foundHoles.length}`);
+            newLines.push(concatPoly.line, ...foundHoles.map(l => l.line).filter(l => l != undefined));
+            lineIndex.removeFromSearch(foundHoles);
+            lineIndex.removeFromSearch(concatPoly);
+            // const removed = arrayRemoveObjects(holeCandidates, ...foundHoles)
+            // if (dbg >= 2) console.log("removed hole candidates:" + removed )
         });
         const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
-        const innerOnlyClockwise = lineIndex.inner.every(l => l.winding == "cw");
+        // these should be empty now
+        const remainingTops = lineIndex.getTopCandidates();
+        // handle remaining holes (not conatined in any high polygon). they are contained in a fulltile polygon that will be created
+        const fullTileHoles = lineIndex.getHoleCandidates();
         try {
-            // handles special - closed inner polys, with LOWER terrain, must be holes in full tile
-            if (innerOnlyClockwise) {
-                if (dbg == "1")
-                    console.log("inner only clockwise holes: ", lineIndex.inner, { final: lineIndex.finalPool.length > 0 });
+            if (fullTileHoles.length > 0) {
+                // holes inside other polygons on this level
+                if (dbg >= 1)
+                    console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles));
+                // check preconditions
+                if (remainingTops.length > 0)
+                    throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled tops(${remainingTops.length}), not handled `);
                 // these cases are not handled correctly, must be holes in other polygons
-                if (lineIndex.finalPool.length > 0)
-                    throw new Error("error: inner Clockwise polys + non-inner polys (final)");
+                //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
                 if (lineIndex.remainCount > 0)
-                    throw new Error("error: inner Clockwise polys + remainCount: " + lineIndex.remainCount);
-                const innerLines = lineIndex.inner.filter(l => l.line).map(l => l.line);
+                    throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainCount: ${lineIndex.remainCount}`);
                 // add as holes to full tile poly
-                newLines.push(fullTileCCW, ...innerLines);
-                lineIndex.inner = [];
+                if (dbg >= 1)
+                    console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `, { fullTileCCW });
+                newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line));
+                lineIndex.removeFromSearch(fullTileHoles);
             }
         }
         catch (e) {
+            console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString());
             console.log(e);
+            console.log({ tops: lineArrayToStrings(remainingTops), holes: lineArrayToStrings(fullTileHoles) });
+            console.log("----------------- ");
         }
-        const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
-        // add inner holes with HIGH terrain
-        if (innerHighPolygons.length > 0) {
-            if (dbg == "1")
-                console.log("inner HIGH polys: ", innerHighPolygons);
-            innerHighPolygons.forEach(l => {
-                // newLines.push(l.line);
+        const remainingInnerRingsHigh = lineIndex.getTopCandidates();
+        // add remaining TOP-rings (that have not been added before)
+        if (remainingInnerRingsHigh.length > 0) {
+            if (dbg >= 1)
+                console.log("remainingInnerRingsHigh: ", lineArrayToStrings(remainingInnerRingsHigh));
+            remainingInnerRingsHigh.forEach(l => {
+                if (l.line)
+                    newLines.push(l.line);
+                lineIndex.removeFromSearch(l);
             });
-            lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
+            //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
         }
+        // lineIndex should be completely Empty
         const rem = lineIndex.getRemaining();
         if (rem.length) {
-            if (dbg)
-                console.log("REMaining: ", rem.length);
-        }
-        else {
-            if (dbg)
-                console.log("REM empty ");
+            console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length);
+            console.error(lineIndex.debugIndex());
+            throw new Error("lineIndex at end not empty: " + tileInfo.coordString());
         }
         rem.forEach(l => {
-            // console.log(l.line)
+            console.log("- add remaining line: ", l.line);
             if (l.line)
                 newLines.push(l.line);
         });
@@ -1258,9 +1434,33 @@
             // console.log(line)
             // newLines.push( line );
         }
-        if (dbg)
-            console.log("===============", lineIndex);
+        //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
         return newLines;
+    }
+    function pointInPolygonFlat(px, py, polygon) {
+        let inside = false;
+        const len = polygon.length;
+        for (let i = 0, j = len - 2; i < len; j = i, i += 2) {
+            const xi = polygon[i], yi = polygon[i + 1];
+            const xj = polygon[j], yj = polygon[j + 1];
+            const intersect = ((yi > py) !== (yj > py)) &&
+                (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+            if (intersect)
+                inside = !inside;
+        }
+        return inside;
+    }
+    function isPolygonInsideFlat(innerFlat, outerFlat) {
+        for (let i = 0; i < innerFlat.length; i += 2) {
+            const x = innerFlat[i];
+            const y = innerFlat[i + 1];
+            if (!pointInPolygonFlat(x, y, outerFlat))
+                return false;
+        }
+        return true;
+    }
+    function lineArrayToStrings(lines) {
+        return lines.map(l => l.toString());
     }
 
     /*
@@ -1433,14 +1633,14 @@
         const fragmentByStartByLevel = new Map();
         const fragmentByEndByLevel = new Map();
         //ISOPOLYS: need this to identify edges
-        const dbg = `${1}`;
+        const dbg = `${0}`;
         const minXY = multiplier * (0 - 1);
         const maxXY = 4096 + Math.abs(minXY);
         const fullTile = new TileInformation(z, x, y, tile);
         fullTile.minXY = minXY;
         fullTile.maxXY = maxXY;
-        // if (dbg == "1")
-            // console.log(`genIsolines: ${z}/${y}/${x} `);
+        if (dbg == "1")
+            console.log(`genIsolines: ${z}/${y}/${x} `);
         function interpolate(point, threshold, accept) {
             if (point[0] === 0) {
                 // left
@@ -1597,10 +1797,10 @@
         //console.log( fullTile.toString() )
         //const { edgeMin, edgeMax } = ispolygons.findTileEdgeMinMax(tile)
         //console.log("segm", segments)
+        if (dbg == "1")
+            console.log(fullTile.toString());
         // ISOPOLY: convert lines to polygons
         if (isoOptions.polygons) {
-            if (dbg == "1")
-                console.log(`gen Tile Isopolys:`, fullTile.toString());
             try {
                 const isoPolygonsMap = {};
                 for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
@@ -1610,12 +1810,12 @@
                         isoPolygonsMap[elevationLevel] = polys;
                 }
                 if (dbg == "1")
-                    console.log("- isoPolygonsMap", isoPolygonsMap);
+                    console.log("isoPolygonsMap", isoPolygonsMap);
                 // generate full tile polys
                 const levels = isoOptions.levels;
                 const fullTilePolys = generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z);
                 if (Object.keys(fullTilePolys).length) {
-                    
+                    // console.log("fullTilePolys",fullTilePolys );
                     if (dbg == "1")
                         console.log(`- fullTilePolys`, fullTilePolys);
                 }
@@ -1633,7 +1833,8 @@
             for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
                 // const levelIsoLines = segments[elevationLevel]
                 const lineIndex = new LineIndex(elevationIsoLines, minXY, maxXY);
-                console.log("lineIndex isos", elevationLevel, lineIndex.debugIndex());
+                if (dbg == "1")
+                    console.log("lineIndex", elevationLevel, lineIndex.debugIndex());
                 //if (polys.length > 0)
                 isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
             }
