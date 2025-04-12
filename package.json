@@ -14,8 +14,9 @@
   },
   "scripts": {
     "bench": "npm run build && node benchmark.js",
-    "indexpatch_cp": "rm -f dist/indexpatch.js && cp demo_gpws/indexpatch.js dist/indexpatch.js",
-    "indexpatch": "cp dist/index.js dist/indexpatch.js && git add dist/indexpatch.js && git commit -m `ip-build` && npm run indexpatch_cp",
+    "indexpatch_cp_gpws": "rm -f dist/indexpatch.js && cp demo_gpws/indexpatch.js dist/indexpatch.js",
+    "indexpatch_new": "cp dist/index.js dist/indexpatch.js && git add dist/indexpatch.js && git commit -m `ip-build`",
+    "build+indexpatch": "npm run build && npm run indexpatch_new",
     "build": "rm -rf dist && rollup -c && npm run generate-types && tsc --project tsconfig.dist.json",
     "test-build-v3": "cd test-project-maplibre-3 && rm -rf node_modules && rm -rf package-lock.json && npm i && npm test",
     "test-build": "cd test-project && rm -rf node_modules && rm -rf package-lock.json && npm i && npm test",
