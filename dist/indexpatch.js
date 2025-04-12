@@ -990,6 +990,7 @@
             }
             //  console.log( "REMOVE:",line )
             this.lineIndex.removeLine(line);
+            this.inner = this.inner.filter(l => l !== line);
             // for (const [edge, node] of Object.entries(this.lineIndex)) {
             //     //console.log( edge, node)
             //     node.s = node.s.filter(l => l !== line)
