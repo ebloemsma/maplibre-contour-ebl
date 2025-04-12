@@ -35,6 +35,12 @@
       padding: 10px;
     }
 
+    .legend {
+      position: absolute; background-color: white; height: 100px; width: 100px; right: 20px; top: 20px;
+      border: 1px solid black;
+      display:none;
+    }
+
     .map-overlay .map-overlay-inner {
       background-color: #fff;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -106,12 +112,12 @@
       </fieldset>
 
       <div class="slidecontainer">
-        <input type="range" min="0" max="6000" value="50" class="slider" id="altSlider" style="width: 300px">
+        <input type="range" min="0" max="6000" value="50" class="slider" id="altSlider" style="width: 100%">
       </div>
 
     </div>
   </div>
-  <div style="position: absolute; background-color: white; height: 100px; width: 100px; "></div>
+  <div id="legend" class="legend" ></div>
   <script>
 
     const demTileServerBaseUrl = TILESERVER_AWS
@@ -147,9 +153,7 @@
       let lvlIndex=-1
       for (let [rele, ele] of levels) {
         lvlIndex+=1
-
         const lvlColor = getBrownShade(lvlIndex)
-
         const value = {
           level: ele,
           props: {
@@ -157,22 +161,22 @@
             terrEle: ele,
             lvlIndex ,
             lvlColor
-            //terrColor: levelCfg[`${rele}`]
           }
         }
         result.push(value)
       }
-      console.log(result)
+      // console.log(result)
       return result;
     }
 
-    demSource.GetOptions = (tileCoords) => {
-      const levelDef = createTerrainCfg(baseAltitude);
+    let layerConfig = createTerrainCfg(baseAltitude);
 
+    demSource.GetOptions = (tileCoords) => {
+      // const levelDef = createTerrainCfg(baseAltitude);
       //console.log("createTerrainCfg", gpwsLevels.map(e => [e.level, e.props]))
       const config = {
-        levels: levelDef.map(e => e.level), //[ -300, 0,100, 400],
-        levelDef: levelDef,
+        levels: layerConfig.map(e => e.level), //[ -300, 0,100, 400],
+        levelDef: layerConfig,
         //intervals : [100], //levels[0]
         polygons: true,
         deltaReference: baseAltitude, //400,
@@ -319,10 +323,17 @@
       baseAltitude = Number($e.target.value)
       console.log("baseAltitude:", baseAltitude)
       setAltElement.innerHTML = baseAltitude
+      layerConfig = createTerrainCfg(baseAltitude);
+      updateLegend()
       //force map-update
       map.style.sourceCaches['contourSourceFeet'].clearTiles()
       map.style.sourceCaches['contourSourceFeet'].update(map.transform)
     };
+
+    function updateLegend(){
+        const element = document.getElementById("legend")
+        console.log(layerConfig)
+    }
 
     map.on("click", e => {
       console.log(e.lngLat)
