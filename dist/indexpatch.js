@@ -434,6 +434,27 @@
     function getLineFirst(line) {
         return { x: line[0], y: line[1] };
     }
+    function getLineBBox(line) {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        const numPoints = line.length / 2;
+        for (let i = 0; i < numPoints; i++) {
+            const x1 = line[2 * i];
+            const y1 = line[2 * i + 1];
+            maxX = Math.max(maxX, x1);
+            maxY = Math.max(maxY, y1);
+            minX = Math.min(minX, x1);
+            minY = Math.min(minY, y1);
+        }
+        return {
+            minX,
+            minY,
+            maxX,
+            maxY
+        };
+    }
     function getLineBorderCode(line, minXY, maxXY) {
         if (!line)
             throw new Error("empty line");
@@ -553,6 +574,7 @@
             this.brd = border;
             // cw : inner lower
             // ccw: inner is higher
+            this.bbox = getLineBBox(l);
             if (this.isClosed) {
                 const polyInfo = analyzePolygon(this.line);
                 this.info = polyInfo;
@@ -1159,6 +1181,8 @@
         if (minXY == undefined || maxXY == undefined)
             throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
         const lineIndex = new LineIndex(lines, minXY, maxXY);
+        const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+        const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
         // console.log( "INDEX",lineIndex.debugIndex() ) 
         // console.log( "INDEX Orig",lineIndex.debugIndexOrig() ) 
         if (dbg >= 1)
@@ -1220,10 +1244,13 @@
             appendingLines.forEach(l => lineIndex.removeFromSearch(l));
             line = lineIndex.getFirst();
         }
+        console.log("- closed lines result: ", lineIndex.finalPool);
         lineIndex.finalPool.forEach(l => {
             // console.log(l.line)
-            if (l.line)
+            if (l.line) {
+                testPolyContainsInner(l, innerLowPolygonsCW);
                 newLines.push(l.line);
+            }
         });
         if (dbg >= 1)
             console.log("- finalLines: ", { finalPoolLen: lineIndex.finalPool.length });
@@ -1236,8 +1263,6 @@
         // ccw: denotes higher terrain - can just be added as polygons
         // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
         //     polygons created by appending ot maybe a fulltile polygon
-        const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
-        const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
         try {
             if (innerLowPolygonsCW.length > 0) {
                 // holes inside other polygons on this level
@@ -1298,6 +1323,35 @@
         }
         //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
         return newLines;
+    }
+    function testPolyContainsInner(poly, innerPolys) {
+        console.log("- testPolyInner:", poly.toString2());
+        innerPolys.forEach(inner => {
+            const isInseide = isPolygonInsideFlat(inner.line, poly.line);
+            console.log(`  - ${isInseide} <- ${inner.toString2()}`);
+        });
+    }
+    function pointInPolygonFlat(px, py, polygon) {
+        let inside = false;
+        const len = polygon.length;
+        for (let i = 0, j = len - 2; i < len; j = i, i += 2) {
+            const xi = polygon[i], yi = polygon[i + 1];
+            const xj = polygon[j], yj = polygon[j + 1];
+            const intersect = ((yi > py) !== (yj > py)) &&
+                (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+            if (intersect)
+                inside = !inside;
+        }
+        return inside;
+    }
+    function isPolygonInsideFlat(innerFlat, outerFlat) {
+        for (let i = 0; i < innerFlat.length; i += 2) {
+            const x = innerFlat[i];
+            const y = innerFlat[i + 1];
+            if (!pointInPolygonFlat(x, y, outerFlat))
+                return false;
+        }
+        return true;
     }
 
     /*
