@@ -1213,16 +1213,16 @@
             if (dbg >= 2)
                 console.log(`close Line (${i}) START`, currentEdgeLine);
             let linesToAppend = [];
-            let nextAppendCandidateLine = currentEdgeLine;
+            let currentAppendCandidateLine = currentEdgeLine;
             // look for all other edge-lines in clockwise direction if they may be concat to currentLines
             for (let appendLoopCount = 0; appendLoopCount < totalEdgeLineCount; appendLoopCount++) {
                 //if (appendLoopCount == initLineCount-1) {
                 //console.log("WARN: appendLoop has reached init line count");
                 //}
                 //the next line which end is on the edge can be appended
-                let nextLine = lineIndex.findNext2(nextAppendCandidateLine.start, nextAppendCandidateLine.brd.start, "end");
+                let nextLine = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
                 if (!nextLine) {
-                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, nextAppendCandidateLine });
+                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
                     break;
                 }
                 const nextIsSame = currentEdgeLine.isIdentical(nextLine);
@@ -1236,7 +1236,7 @@
                         console.log(`close line(${i} - append line:`, nextLine);
                     linesToAppend.push(nextLine);
                 }
-                nextAppendCandidateLine = nextLine;
+                currentAppendCandidateLine = nextLine;
             }
             const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
             concatedPolygonsArray.push(concatedLine);
