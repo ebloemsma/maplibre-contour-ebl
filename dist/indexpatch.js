@@ -1169,7 +1169,6 @@
      * @returns
      */
     function convertTileIsolinesToPolygons(lvl, lines, tileInfo) {
-        var _a;
         if (!lines || lines.length < 1)
             return [];
         const newLines = [];
@@ -1190,14 +1189,13 @@
         // console.log( "INDEX Orig",lineIndex.debugIndexOrig() ) 
         if (dbg >= 1)
             console.log(`- lvl: ${lvl}, lines:`, lineIndex.debugIndexOrig());
-        const initLineCount = lineIndex.getRemaining().length;
+        // iterate over all edge-lines in the tile.
+        // not all lines will end up here because they me be appended to other lines and removed from the list
+        const totalEdgeLineCount = lineIndex.getRemaining().length;
         const firstline = lineIndex.getFirst();
         let line = firstline;
-        ((_a = line === null || line === undefined ? undefined : line.brd) === null || _a === undefined ? undefined : _a.start) || false;
+        //let edge = line?.brd?.start || false;
         let i = -1;
-        //----
-        // iterate over all lines in the tile.
-        // not all lines will end up here because they me be appended to other lines and removed from the list
         while (line) {
             i++;
             // stop if first line is reached again
@@ -1207,7 +1205,7 @@
                     console.log(`close line(${i} END - reached first again`);
                 break;
             }
-            if (i > initLineCount) {
+            if (i > totalEdgeLineCount) {
                 line = null;
                 if (dbg >= 2)
                     console.log(`close line(${i} END - line count reached`);
@@ -1215,37 +1213,37 @@
             }
             if (dbg >= 2)
                 console.log(`close Line (${i}) START`, line);
-            let appendingLines = [];
-            let nextAppendLine = line;
+            let linesToAppend = [];
+            let nextAppendCandidateLine = line;
             // look for all lines with edge contact in clockwise
-            for (let appendLoopCount = 0; appendLoopCount < initLineCount; appendLoopCount++) {
+            for (let appendLoopCount = 0; appendLoopCount < totalEdgeLineCount; appendLoopCount++) {
                 //if (appendLoopCount == initLineCount-1) {
                 //console.log("WARN: appendLoop has reached init line count");
                 //}
                 //the next line which end is on the edge can be appended
-                let nextLine = lineIndex.findNext2(nextAppendLine.start, nextAppendLine.brd.start, "end");
+                let nextLine = lineIndex.findNext2(nextAppendCandidateLine.start, nextAppendCandidateLine.brd.start, "end");
                 if (!nextLine) {
-                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { line, nextAppendLine });
+                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { line, nextAppendCandidateLine });
                     break;
                 }
                 const nextIsSame = line.isIdentical(nextLine);
                 if (nextIsSame) {
                     if (dbg >= 2)
-                        console.log(`close line(${i} END self reached, append-count: ${appendingLines.length}`);
+                        console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
                     break;
                 }
                 if (nextLine) {
                     if (dbg >= 2)
                         console.log(`close line(${i} - append line:`, nextLine);
-                    appendingLines.push(nextLine);
+                    linesToAppend.push(nextLine);
                 }
-                nextAppendLine = nextLine;
+                nextAppendCandidateLine = nextLine;
             }
-            const concatedLine = lineIndex.createConcatedLine(line, appendingLines, minXY, maxXY);
+            const concatedLine = lineIndex.createConcatedLine(line, linesToAppend, minXY, maxXY);
             concatedPolygonsArray.push(concatedLine);
             //lineIndex.addToFinal(concatedLine)
             lineIndex.removeFromSearch(line);
-            appendingLines.forEach(l => lineIndex.removeFromSearch(l));
+            linesToAppend.forEach(l => lineIndex.removeFromSearch(l));
             line = lineIndex.getFirst();
         }
         console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
