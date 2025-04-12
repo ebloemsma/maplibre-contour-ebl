@@ -1128,7 +1128,7 @@
             // add the start point at end
             return line;
         }
-        appendLinesToClone(lineIn, buffer, minXY, maxXY) {
+        createConcatedLine(lineIn, buffer, minXY, maxXY) {
             const dbg = `${0}`;
             const bufferRev = [...buffer].reverse();
             const line = lineIn.clone();
@@ -1240,8 +1240,8 @@
                 }
                 nextAppendLine = nextLine;
             }
-            const newLine = lineIndex.appendLinesToClone(line, appendingLines, minXY, maxXY);
-            lineIndex.addToFinal(newLine);
+            const concatedLine = lineIndex.createConcatedLine(line, appendingLines, minXY, maxXY);
+            lineIndex.addToFinal(concatedLine);
             lineIndex.removeFromSearch(line);
             appendingLines.forEach(l => lineIndex.removeFromSearch(l));
             line = lineIndex.getFirst();
