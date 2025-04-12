@@ -1246,7 +1246,7 @@
             appendingLines.forEach(l => lineIndex.removeFromSearch(l));
             line = lineIndex.getFirst();
         }
-        console.log("- closed lines result: ", lineIndex.finalPool);
+        console.log("- closed lines result: ", lineArrayToStrings(lineIndex.finalPool));
         lineIndex.finalPool.forEach(l => {
             // console.log(l.line)
             if (l.line) {
@@ -1354,6 +1354,9 @@
                 return false;
         }
         return true;
+    }
+    function lineArrayToStrings(lines) {
+        return lines.map(l => lines.toString());
     }
 
     /*
