@@ -10,7 +10,10 @@ const greenLandState = { lng: 6.06, lat: 58.86, zoom: 11.4 };
 
 const seattleState = { lng: -122.1, lat: 47.90, zoom: 11 };
 
-const initialState = seattleState
+const initTile11_329_713 = { lng: -122.087, lat: 47.807, zoom: 11 };
+const initTile11_328_713 = { lng: -122.236, lat: 47.803, zoom: 11 };
+
+const initialState = initTile11_328_713
 
 class CountourMao extends maplibregl.Map {
     constructor() {
