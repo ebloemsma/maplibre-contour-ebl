@@ -1193,29 +1193,28 @@
         // not all lines will end up here because they me be appended to other lines and removed from the list
         const totalEdgeLineCount = lineIndex.getRemaining().length;
         const firstline = lineIndex.getFirst();
-        let line = firstline;
-        //let edge = line?.brd?.start || false;
         let i = -1;
-        while (line) {
+        let currentEdgeLine = firstline;
+        while (currentEdgeLine) {
             i++;
             // stop if first line is reached again
-            if ((i > 1 && firstline == line) || i > 50) {
-                line = null;
+            if ((i > 1 && firstline == currentEdgeLine) || i > 50) {
+                currentEdgeLine = null;
                 if (dbg >= 2)
                     console.log(`close line(${i} END - reached first again`);
                 break;
             }
             if (i > totalEdgeLineCount) {
-                line = null;
+                currentEdgeLine = null;
                 if (dbg >= 2)
                     console.log(`close line(${i} END - line count reached`);
                 break;
             }
             if (dbg >= 2)
-                console.log(`close Line (${i}) START`, line);
+                console.log(`close Line (${i}) START`, currentEdgeLine);
             let linesToAppend = [];
-            let nextAppendCandidateLine = line;
-            // look for all lines with edge contact in clockwise
+            let nextAppendCandidateLine = currentEdgeLine;
+            // look for all other edge-lines in clockwise direction if they may be concat to currentLines
             for (let appendLoopCount = 0; appendLoopCount < totalEdgeLineCount; appendLoopCount++) {
                 //if (appendLoopCount == initLineCount-1) {
                 //console.log("WARN: appendLoop has reached init line count");
@@ -1223,10 +1222,10 @@
                 //the next line which end is on the edge can be appended
                 let nextLine = lineIndex.findNext2(nextAppendCandidateLine.start, nextAppendCandidateLine.brd.start, "end");
                 if (!nextLine) {
-                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { line, nextAppendCandidateLine });
+                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, nextAppendCandidateLine });
                     break;
                 }
-                const nextIsSame = line.isIdentical(nextLine);
+                const nextIsSame = currentEdgeLine.isIdentical(nextLine);
                 if (nextIsSame) {
                     if (dbg >= 2)
                         console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
@@ -1239,12 +1238,12 @@
                 }
                 nextAppendCandidateLine = nextLine;
             }
-            const concatedLine = lineIndex.createConcatedLine(line, linesToAppend, minXY, maxXY);
+            const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
             concatedPolygonsArray.push(concatedLine);
             //lineIndex.addToFinal(concatedLine)
-            lineIndex.removeFromSearch(line);
+            lineIndex.removeFromSearch(currentEdgeLine);
             linesToAppend.forEach(l => lineIndex.removeFromSearch(l));
-            line = lineIndex.getFirst();
+            currentEdgeLine = lineIndex.getFirst();
         }
         console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
         concatedPolygonsArray.forEach(l => {
