@@ -2,7 +2,7 @@ import { classifyRings } from "@mapbox/vector-tile";
 import type { HeightTile } from "./height-tile";
 
 export class TileInformation {
-    
+
     setTile(tile: HeightTile) {
 
         const { edgeMin, edgeMax } = findTileEdgeMinMax(tile)
@@ -38,17 +38,17 @@ export class TileInformation {
      * @param y 
      * @returns 
      */
-    isTile(z,x,y){
-        
-        const isZ = (z!==null)?this.z==z:true;  
-        const isY = (y!==null)?this.y==y:true;
-        const isX = (x!==null)?this.x==x:true;
-        return ( isZ && isX && isY)
+    isTile(z, x, y) {
+
+        const isZ = (z !== null) ? this.z == z : true;
+        const isY = (y !== null) ? this.y == y : true;
+        const isX = (x !== null) ? this.x == x : true;
+        return (isZ && isX && isY)
 
     }
 
     toString() {
-        return `Tile: ${this.z}/${this.x}/${this.y}, min/max: ${Math.round(this.min||0)}/${Math.round(this.max||0)}  edgemin/max: ${this.edgeMin}/${this.edgeMax}` //min/maxXY: ${this.minXY},${this.maxXY} `
+        return `Tile: ${this.z}/${this.x}/${this.y}, min/max: ${Math.round(this.min || 0)}/${Math.round(this.max || 0)}  edgemin/max: ${this.edgeMin}/${this.edgeMax}` //min/maxXY: ${this.minXY},${this.maxXY} `
     }
 
     coordString() {
@@ -190,6 +190,32 @@ function getLineLast(line) {
 }
 function getLineFirst(line) {
     return { x: line[0], y: line[1] }
+}
+
+function getLineBBox(line) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    const numPoints = line.length / 2;
+    for (let i = 0; i < numPoints; i++) {
+        const x1 = line[2 * i];
+        const y1 = line[2 * i + 1];
+
+        maxX = Math.max(maxX, x1);
+        maxY = Math.max(maxY, y1);
+        minX = Math.min(minX, x1);
+        minY = Math.min(minY, y1);
+    }
+
+    return {
+        minX,
+        minY,
+        maxX,
+        maxY
+    }
+
 }
 
 function getLineBorderCode(line: LineDefinition, minXY, maxXY) {
@@ -346,6 +372,8 @@ class TiledLine {
     end: any;
     brd: any;
 
+    bbox?: { minX: number, maxX: number, minY: number, maxY: number }
+
     length?: number;
     winding?: "cw" | "ccw";
     area?: number;
@@ -375,6 +403,8 @@ class TiledLine {
 
         // cw : inner lower
         // ccw: inner is higher
+
+        this.bbox = getLineBBox(l)
 
         if (this.isClosed) {
             const polyInfo = analyzePolygon(this.line)
@@ -454,6 +484,8 @@ class TiledLine {
     }
 
     toString() {
+        return this.toString2()
+
         const l = this;
         if (l.isClosed) {
             return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `
@@ -461,6 +493,26 @@ class TiledLine {
 
         return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${l.line?.length} `;
     };
+
+    toString2( tileLineIndex? ){
+        const l = this;
+        const winding = (l.winding) ? l.winding : "";
+        const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
+        const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
+        const tiny = (l.isTiny) ? "tiny," : "";
+        const length = (l.line) ? "l:"+l.line.length +",": "";
+        const area = (l.isClosed)?`area:${l.info.area},`:"";
+
+        const bbox = (l.bbox)?`bbx: [${l.bbox.minX},${l.bbox.minY} - ${l.bbox.maxX},${l.bbox.maxY}],`:"";
+        
+
+        let selfClosable = (tileLineIndex?.lineIsSelfClosable(l)) ? "selfClosable" : "";
+        if (l.isClosed) {
+            return `#${l.hash} ${closed} ${length} ${area} ${bbox} ${tiny}`;
+        }
+        return `#${l.hash} ${length} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}--${l.end.x},${l.end.y}] ${selfClosable} ${bbox}`;
+    }
+
 } // class TileLine
 
 const EDGES: EdgeId[] = [1, 2, 4, 8]
@@ -470,14 +522,14 @@ const EDGES: EdgeId[] = [1, 2, 4, 8]
 export class LineIndex {
     lineIndex: TileEdgeLineIndex;
     origIndex: TileEdgeLineIndex;
-    finalPool: TiledLine[] = [];
+    //finalPool: TiledLine[] = [];
     filtered: TiledLine[] = [];
     inner: TiledLine[] = [];
 
     constructor(lines, minXY, maxXY) {
         this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
         this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
-        this.finalPool = [];
+        //this.finalPool = [];
 
         const lineObjects = lines.map(l => {
             return new TiledLine(l, minXY, maxXY);
@@ -695,7 +747,7 @@ export class LineIndex {
 
         const list = db[edge]
 
-        if( !list ) throw new Error("edgeIndex is null for edge: " + edge)
+        if (!list) throw new Error("edgeIndex is null for edge: " + edge)
 
         if (!startOrEnd) throw new Error("start or end missing"); //return list;
         if (startOrEnd == "start") return list.s;
@@ -713,10 +765,10 @@ export class LineIndex {
 
 
 
-    addToFinal(line: TiledLine) {
-        this.finalPool.push(line)
-        // console.log( "FINAL add:",line ) 
-    }
+    // addToFinal(line: TiledLine) {
+    //     this.finalPool.push(line)
+    //     // console.log( "FINAL add:",line ) 
+    // }
 
     debugIndexOrig() {
         return this.debugIndexDB(this.origIndex)
@@ -735,22 +787,23 @@ export class LineIndex {
 
 
         const lineToString = (l: TiledLine) => {
-
-            const winding = (l.winding)?l.winding:"";
-
-            const innerHighLow = (l.winding=="cw")?"low": (l.winding=="ccw"?"high":"");
-
-            const closed = (l.isClosed)?`closed:${winding}/${innerHighLow},`:"";
-            const tiny = (l.isTiny)?"tiny,":"";
+            return l.toString2()
             
-            
+            const winding = (l.winding) ? l.winding : "";
+
+            const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
+
+            const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
+            const tiny = (l.isTiny) ? "tiny," : "";
+
+
             let selfClosable = (this.lineIsSelfClosable(l)) ? "selfClosable" : "";
 
             if (l.isClosed) {
                 return `#${l.hash} ${closed} ${tiny} area:${l.area} `
             }
 
-            
+
             return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y} - ${l.end.x},${l.end.y} ${selfClosable}]`
         }
 
@@ -794,8 +847,8 @@ export class LineIndex {
         const edge = line.brd.start;
 
         // no edge found so line is closed
-        if( line.isClosed) return false;
-        if(!edge) return false;
+        if (line.isClosed) return false;
+        if (!edge) return false;
 
         let nextLine = LineIndex.findNextEdgeLine(this.origIndex, point, edge, "end");
 
@@ -1027,7 +1080,7 @@ export class LineIndex {
     }
 
 
-    appendLinesToClone(lineIn: TiledLine, buffer, minXY: number, maxXY: number) {
+    createConcatedLine(lineIn: TiledLine, buffer, minXY: number, maxXY: number) {
         const dbg: string = `${0}`;
 
         const bufferRev = [...buffer].reverse()
@@ -1096,11 +1149,11 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     if (!lines || lines.length < 1) return [];
 
     const newLines: LineArray = [];
-    const newPolysAppended: LineArray = [];
+    const concatedPolygonsArray: TiledLine [] = [];
 
     // SET-DBG convertTileIsolinesToPolygons 
     //const dbg = Number(`${ tileInfo.isTile(null,329,713)?"1":"0" }`);
-    const dbg = Number(`${ 0 }`);
+    const dbg = Number(`${0}`);
 
     if (dbg >= 1) console.log(`convertIsoToPolys START - Tile: ${tileInfo.coordString()} `)
 
@@ -1109,10 +1162,14 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     if (minXY == undefined || maxXY == undefined) throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
 
     const lineIndex = new LineIndex(lines, minXY, maxXY)
+    const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+    const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
+
+
     // console.log( "INDEX",lineIndex.debugIndex() ) 
     // console.log( "INDEX Orig",lineIndex.debugIndexOrig() ) 
 
-    if (dbg >= 1) console.log( `- lvl: ${lvl}, lines:`,lineIndex.debugIndexOrig() ) 
+    if (dbg >= 1) console.log(`- lvl: ${lvl}, lines:`, lineIndex.debugIndexOrig())
 
     const initLineCount = lineIndex.getRemaining().length;
     const firstline = lineIndex.getFirst();
@@ -1138,7 +1195,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
             break;
         };
 
-        if (dbg >= 2) console.log(`close Line (${i}) START` , line)
+        if (dbg >= 2) console.log(`close Line (${i}) START`, line)
 
         let appendingLines: TiledLine[] = [];
         let nextAppendLine = line
@@ -1159,7 +1216,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
 
             const nextIsSame = line.isIdentical(nextLine)
             if (nextIsSame) {
-                if (dbg >= 2) console.log(`close line(${i} END self reached, append-count: ${appendingLines.length}` )
+                if (dbg >= 2) console.log(`close line(${i} END self reached, append-count: ${appendingLines.length}`)
                 break;
             }
 
@@ -1172,24 +1229,28 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
             nextAppendLine = nextLine
         }
 
-        const newLine = lineIndex.appendLinesToClone(line, appendingLines, minXY, maxXY)
+        const concatedLine = lineIndex.createConcatedLine(line, appendingLines, minXY, maxXY)
+        concatedPolygonsArray.push(concatedLine)
+        //lineIndex.addToFinal(concatedLine)
 
-        lineIndex.addToFinal(newLine)
         lineIndex.removeFromSearch(line)
         appendingLines.forEach(l => lineIndex.removeFromSearch(l))
 
         line = lineIndex.getFirst();
     }
 
-    lineIndex.finalPool.forEach(l => {
+    console.log("- concatedPolygons: ", lineArrayToStrings(  concatedPolygonsArray ))
+
+    concatedPolygonsArray.forEach(l => {
         // console.log(l.line)
-        if (l.line) newLines.push(l.line)
+        if (l.line) {
+            testPolyContainsInner(l, innerLowPolygonsCW)
+            newLines.push(l.line);
+        }
     })
 
-    if(dbg >= 1) console.log("- finalLines: ",  { finalPoolLen: lineIndex.finalPool.length })
-
-    if (  (dbg >= 1 ) && lineIndex.inner.length > 0 ) {
-        console.log("innerPolys: ", lineIndex.inner )
+    if ((dbg >= 1) && lineIndex.inner.length > 0) {
+        console.log("innerPolys: ", lineIndex.inner)
     }
 
     const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32]
@@ -1201,48 +1262,45 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
     //     polygons created by appending ot maybe a fulltile polygon
 
-    const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw")
-    const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
-
     try {
-        
-        if (innerLowPolygonsCW.length > 0 ) {
+
+        if (innerLowPolygonsCW.length > 0) {
             // holes inside other polygons on this level
-            if(dbg >= 1) console.log("innerPolys LOW/cw: ", innerLowPolygonsCW )
-            
+            if (dbg >= 1) console.log("innerPolys LOW/cw: ", innerLowPolygonsCW)
+
             // check preconditions
-            if( innerHighPolygons.length > 0  ) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + inner HIGH (${innerHighPolygons.length}), not handled ` )
+            if (innerHighPolygons.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + inner HIGH (${innerHighPolygons.length}), not handled `)
 
             // these cases are not handled correctly, must be holes in other polygons
-            if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) ` )
-            if (lineIndex.remainCount > 0) throw new Error( `innerPolys LOW (${innerLowPolygonsCW.length}) +  remainCount: ${lineIndex.remainCount}`  )
+            //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
+            if (lineIndex.remainCount > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) +  remainCount: ${lineIndex.remainCount}`)
 
             // special case that is handled - closed inner polys, with LOWER terrain, must be holes in full tile
-            const fullTileHolesLines = lineIndex.inner.filter(l=> l.line).map(l => l.line) as LineDefinition[]
+            const fullTileHolesLines = lineIndex.inner.filter(l => l.line).map(l => l.line) as LineDefinition[]
             // add as holes to full tile poly
-            if(dbg >= 1) console.log("innerPolys LOW: addFullTile + holes: ", {fullTileCCW, fullTileHolesLines} )
+            if (dbg >= 1) console.log("innerPolys LOW: addFullTile + holes: ", { fullTileCCW, fullTileHolesLines })
 
-            newLines.push(fullTileCCW, ...fullTileHolesLines );
+            newLines.push(fullTileCCW, ...fullTileHolesLines);
             lineIndex.inner = [];
-            
+
         }
 
     } catch (e) {
-        console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString() )
+        console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString())
         console.log(e)
-        console.log({innerHighPolygons, innerLowPolygonsCW})
+        console.log({ innerHighPolygons, innerLowPolygonsCW })
 
         console.log("----------------- ")
     }
 
 
-    
+
     // add inner holes with HIGH terrain
     if (innerHighPolygons.length > 0) {
-        if(dbg >= 1) console.log("innerPolys - high(ccw): ", innerHighPolygons)
+        if (dbg >= 1) console.log("innerPolys - high(ccw): ", innerHighPolygons)
 
         innerHighPolygons.forEach(l => {
-            if( l.line ) newLines.push(l.line);
+            if (l.line) newLines.push(l.line);
         })
 
         lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
@@ -1252,9 +1310,9 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     const rem = lineIndex.getRemaining();
     if (rem.length) {
         console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length)
-    } 
+    }
     rem.forEach(l => {
-        console.log("- add remaining line: " , l.line)
+        console.log("- add remaining line: ", l.line)
         if (l.line) newLines.push(l.line)
     })
 
@@ -1273,4 +1331,42 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     }
     //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
     return newLines;
+}
+
+function testPolyContainsInner(poly, innerPolys) {
+    console.log("- testPolyInner:", poly.toString2())
+    innerPolys.forEach(inner => {
+        const isInseide = isPolygonInsideFlat(inner.line, poly.line)
+        console.log(`  - ${isInseide} <- ${inner.toString2()}`)
+    })
+}
+
+function pointInPolygonFlat(px, py, polygon) {
+    let inside = false;
+    const len = polygon.length;
+
+    for (let i = 0, j = len - 2; i < len; j = i, i += 2) {
+        const xi = polygon[i], yi = polygon[i + 1];
+        const xj = polygon[j], yj = polygon[j + 1];
+
+        const intersect = ((yi > py) !== (yj > py)) &&
+            (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+
+        if (intersect) inside = !inside;
+    }
+
+    return inside;
+}
+
+function isPolygonInsideFlat(innerFlat, outerFlat) {
+    for (let i = 0; i < innerFlat.length; i += 2) {
+        const x = innerFlat[i];
+        const y = innerFlat[i + 1];
+        if (!pointInPolygonFlat(x, y, outerFlat)) return false;
+    }
+    return true;
+}
+
+function lineArrayToStrings( lines ){
+    return lines.map( l => l.toString() )
 }
