@@ -1247,13 +1247,21 @@
         }
         if (dbg >= 1)
             console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+        if (dbg >= 1)
+            console.log("- lineIndex (should have noe egde lines): ", lineIndex.debugIndex());
+        // handle inner self-closed lines (rings/polygons) that never touched edges
+        // depending on winding they denote higher or lower terrain
+        // ccw: denotes higher terrain - can just be added as polygons
+        // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
+        //     polygons created by appending ot maybe a fulltile polygon
         // array will be mutated, when holes are contained in another polygon
         const holeCandidates = [...innerLowPolygonsCW].filter(l => !l.isTiny);
-        // find any holes (inner polys with low terrain inside)
+        // process concated polygons and possible holes
         concatedPolygonsArray.forEach(concatPoly => {
             // console.log(l.line)
             if (!concatPoly.line)
                 return;
+            // find any holes (inner polys with low terrain inside)
             const currentHoleCandidates = [...holeCandidates];
             if (dbg >= 1 && currentHoleCandidates.length > 0)
                 console.log(`- find poly holes(inner-low):${currentHoleCandidates.length} concatPoly:`, concatPoly.toString2(), currentHoleCandidates);
@@ -1277,16 +1285,12 @@
             // if (dbg >= 2) console.log("removed hole candidates:" + removed )
         });
         const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
-        // handle inner self-closed lines (rings/polygons) that never touched edges
-        // depending on winding they denote higher or lower terrain
-        // ccw: denotes higher terrain - can just be added as polygons
-        // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
-        //     polygons created by appending ot maybe a fulltile polygon
+        // handle remaining low holes which do not belong to any known polygon
         try {
-            if (innerLowPolygonsCW.length > 0) {
+            if (holeCandidates.length > 0) {
                 // holes inside other polygons on this level
                 if (dbg >= 1)
-                    console.log("innerPolys LOW/cw: ", innerLowPolygonsCW);
+                    console.log("uncontained holes(low/cw): ", holeCandidates);
                 // check preconditions
                 if (innerHighPolygons.length > 0)
                     throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + inner HIGH (${innerHighPolygons.length}), not handled `);
