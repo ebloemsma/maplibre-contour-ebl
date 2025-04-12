@@ -1356,7 +1356,7 @@
         return true;
     }
     function lineArrayToStrings(lines) {
-        return lines.map(l => lines.toString());
+        return lines.map(l => l.toString());
     }
 
     /*
