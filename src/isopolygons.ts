@@ -29,7 +29,7 @@ export class TileInformation {
     }
 
     toString() {
-        return `TileInfo: ${this.z},${this.x},${this.y}, min/max: ${this.min}/${this.max}  edgemin/max: ${this.edgeMin}/${this.edgeMax}` //min/maxXY: ${this.minXY},${this.maxXY} `
+        return `Tile: ${this.z}/${this.x}/${this.y}, min/max: ${Math.round(this.min||0)}/${Math.round(this.max||0)}  edgemin/max: ${this.edgeMin}/${this.edgeMax}` //min/maxXY: ${this.minXY},${this.maxXY} `
     }
 }
 
@@ -1144,6 +1144,8 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     try {
         // handles special - closed inner polys, with LOWER terrain, must be holes in full tile
         if (innerOnlyClockwise) {
+            if(dbg=="1") console.log("innerPolys - low(cw): ", innerOnlyClockwise)
+
             if(dbg=="1") console.log("inner only clockwise holes: ", lineIndex.inner, { final: lineIndex.finalPool.length > 0 })
 
             // these cases are not handled correctly, must be holes in other polygons
@@ -1163,10 +1165,10 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw")
     // add inner holes with HIGH terrain
     if (innerHighPolygons.length > 0) {
-        if(dbg=="1") console.log("inner HIGH polys: ", innerHighPolygons)
+        if(dbg=="1") console.log("innerPolys - high(ccw): ", innerHighPolygons)
 
         innerHighPolygons.forEach(l => {
-            // newLines.push(l.line);
+            newLines.push(l.line);
         })
 
         lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");

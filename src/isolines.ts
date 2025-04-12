@@ -392,11 +392,11 @@ export default function generateIsolines(
 
   //console.log("segm", segments)
 
+  if(dbg=="1")  console.log(fullTile.toString())
+
   // ISOPOLY: convert lines to polygons
   if ( isoOptions.polygons ) {
     
-    if(dbg=="1")  console.log(`create isopolys:`, fullTile.toString())
-
     try {
       const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
 
@@ -429,7 +429,7 @@ export default function generateIsolines(
     for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
         // const levelIsoLines = segments[elevationLevel]
         const lineIndex = new ispolygons.LineIndex(elevationIsoLines, minXY, maxXY);
-        console.log("lineIndex isos", elevationLevel, lineIndex.debugIndex())
+        if(dbg=="1") console.log("lineIndex", elevationLevel, lineIndex.debugIndex())
         //if (polys.length > 0)
         isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
     }
