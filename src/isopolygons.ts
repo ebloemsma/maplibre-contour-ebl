@@ -396,13 +396,36 @@ class TiledLine {
     constructor(line, minXY, maxXY) {
         this.done = false
         if (line) {
-            this.line = [...line],
-                this.update(minXY, maxXY)
+            this.line = [...this.fixLine(line)]
+            this.update(minXY, maxXY)
             this.minXY = minXY;
             this.maxXY = maxXY;
         }
 
 
+    }
+
+    fixBorderCoord(value) {
+        //return value;
+
+        if (value == 0) return -32;
+        if (value == 4096) return 4128;
+        return value
+    }
+
+    fixLine(line) {
+        const l = line.length;
+        let sx = line[0];
+        let sy = line[0 + 1];
+        let ex = line[l - 2];
+        let ey = line[l - 1];
+
+        line[0] = this.fixBorderCoord(line[0])
+        line[0 + 1] = this.fixBorderCoord(line[0 + 1])
+        line[l - 2] = this.fixBorderCoord(line[l - 2])
+        line[l - 1] = this.fixBorderCoord(line[l - 1])
+
+        return line;
     }
 
     update(minXY, maxXY) {
@@ -1176,9 +1199,14 @@ export class LineIndex {
  * @param maxXY 
  * @returns 
  */
-export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: TileInformation) {
+export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo: TileInformation) {
 
-    if (!lines || lines.length < 1) return [];
+    const lines = linesIn.filter(l => l.length > 6)
+
+    if (!lines || lines.length < 1) {
+        console.log("Tile w/o lines: " + tileInfo.coordString())
+        return [];
+    }
 
     const newLines: LineArray = [];
     const concatedPolygonsArray: TiledLine[] = [];
@@ -1236,27 +1264,34 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
             //console.log("WARN: appendLoop has reached init line count");
             //}
 
-            //the next line which end is on the edge can be appended
-            let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end")
+            try {
+                //the next line which end is on the edge can be appended
+                let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end")
 
-            if (!nextAppendCandidate) {
-                console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine })
-                break;
+                if (!nextAppendCandidate) {
+                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine })
+                    break;
+                }
+
+                const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate)
+                if (nextIsSame) {
+                    if (dbg >= 2) console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`)
+                    break;
+                }
+
+
+                if (nextAppendCandidate) {
+                    if (dbg >= 2) console.log(`close line(${i} - append line:`, nextAppendCandidate)
+                    linesToAppend.push(nextAppendCandidate)
+                }
+                currentAppendCandidateLine = nextAppendCandidate
+            } catch (error) {
+                console.error("currentAppendCandidateLine", currentAppendCandidateLine)
+                console.error(error)
             }
 
-            const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate)
-            if (nextIsSame) {
-                if (dbg >= 2) console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`)
-                break;
-            }
 
 
-            if (nextAppendCandidate) {
-                if (dbg >= 2) console.log(`close line(${i} - append line:`, nextAppendCandidate)
-                linesToAppend.push(nextAppendCandidate)
-            }
-
-            currentAppendCandidateLine = nextAppendCandidate
         }
 
         const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY)
@@ -1373,7 +1408,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     if (rem.length) {
         console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length)
         console.error(lineIndex.debugIndex())
-        throw new Error("lineIndex at end not empty: "+ tileInfo.coordString() );
+        throw new Error("lineIndex at end not empty: " + tileInfo.coordString());
     }
     rem.forEach(l => {
         console.log("- add remaining line: ", l.line)
