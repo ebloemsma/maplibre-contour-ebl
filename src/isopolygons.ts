@@ -127,7 +127,7 @@ class TileEdgeLineIndex {
 
         const index = new TileEdgeLineIndex();
 
-        const data =  {
+        const data = {
             1: {
                 s: topStart,
                 e: topEnd,
@@ -146,11 +146,11 @@ class TileEdgeLineIndex {
             }
         } as TileEdgeLineIndex;
 
-        return Object.assign( index, data)
+        return Object.assign(index, data)
     }
 
-    removeLine( line: TiledLine) {
-        if(!line) return;
+    removeLine(line: TiledLine) {
+        if (!line) return;
         for (const [edge, node] of Object.entries(this)) {
             //console.log( edge, node)
             node.s = node.s.filter(l => l !== line)
@@ -537,7 +537,10 @@ export class LineIndex {
     getHoleCandidates() {
         return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny)
     }
-    
+    getTopCandidates() {
+        return this.inner.filter(l => l.winding == "ccw").filter(l => !l.isTiny);
+    }
+
     lineIndex: TileEdgeLineIndex;
     origIndex: TileEdgeLineIndex;
     //finalPool: TiledLine[] = [];
@@ -651,9 +654,9 @@ export class LineIndex {
             return (b.end.y - a.end.y)
         })
 
-        
 
-        const indexData =  {
+
+        const indexData = {
 
             1: {
                 s: topStart,
@@ -676,7 +679,7 @@ export class LineIndex {
             }
         }
 
-        return Object.assign( new TileEdgeLineIndex(), indexData )
+        return Object.assign(new TileEdgeLineIndex(), indexData)
     }
 
 
@@ -845,24 +848,24 @@ export class LineIndex {
         return debug;
     }
 
-    removeFromSearch(line: TiledLine | TiledLine [ ]) {
+    removeFromSearch(line: TiledLine | TiledLine[]) {
 
-        if ( Array.isArray (line) ) {
-            line.forEach( l=> this.removeFromSearch(l))
+        if (Array.isArray(line)) {
+            line.forEach(l => this.removeFromSearch(l))
             return;
         }
 
         //  console.log( "REMOVE:",line )
-       
+
         this.lineIndex.removeLine(line)
-        this.inner = this.inner.filter( l => l!==line)
+        this.inner = this.inner.filter(l => l !== line)
 
         // for (const [edge, node] of Object.entries(this.lineIndex)) {
         //     //console.log( edge, node)
         //     node.s = node.s.filter(l => l !== line)
         //     node.e = node.e.filter(l => l !== line)
         // }
-       
+
     }
 
     /** check if line is closable with itself by adding tile corners, 
@@ -1181,7 +1184,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     const concatedPolygonsArray: TiledLine[] = [];
 
     // SET-DBG convertTileIsolinesToPolygons 
-    const dbg = Number(`${ tileInfo.isTile(null,328,713)?"1":"0" }`);
+    const dbg = Number(`${tileInfo.isTile(null, 328, 713) ? "1" : "0"}`);
     //const dbg = Number(`${0}`);
 
     if (dbg >= 1) console.log(`convertIsoToPolys START - Tile: ${tileInfo.coordString()} `)
@@ -1191,7 +1194,7 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     if (minXY == undefined || maxXY == undefined) throw new Error(`min/maxXY is missing min:${minXY} max:${maxXY}`);
 
     const lineIndex = new LineIndex(lines, minXY, maxXY)
-    const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
+    //const innerHighPolygons = lineIndex.inner.filter(l => l.winding == "ccw");
     //const innerLowPolygonsCW = lineIndex.inner.filter(l => l.winding == "cw");
 
 
@@ -1276,17 +1279,17 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
     // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
     //     polygons created by appending ot maybe a fulltile polygon
 
-    // array will be mutated, when holes are contained in another polygon
-
+    // all polygons that may contain inner holes
+    const highPolys = [...concatedPolygonsArray, ...lineIndex.getTopCandidates()]
 
     // process concated polygons and possible holes
-    concatedPolygonsArray.forEach(concatPoly => {
+    highPolys.forEach(concatPoly => {
         // console.log(l.line)
         if (!concatPoly.line) return;
 
         // find any holes (inner polys with low terrain inside)
-        const currentHoleCandidates = lineIndex.getHoleCandidates(); 
-        if (dbg >= 1 && currentHoleCandidates.length>0) console.log(`- find poly holes(inner-low):${currentHoleCandidates.length} concatPoly:`, concatPoly.toString2(), currentHoleCandidates)
+        const currentHoleCandidates = lineIndex.getHoleCandidates();
+        if (dbg >= 1 && currentHoleCandidates.length > 0) console.log(`- find holes(inner-low):${currentHoleCandidates.length} in high-poly:`, concatPoly.toString2(), currentHoleCandidates)
 
         const foundHoles: TiledLine[] = [];
         currentHoleCandidates.forEach(inner => {
@@ -1303,65 +1306,74 @@ export function convertTileIsolinesToPolygons(lvl, lines: LineArray, tileInfo: T
         if (dbg >= 1) console.log(` - finalize poly, holes: ${foundHoles.length}`)
         newLines.push(concatPoly.line, ...foundHoles.map(l => l.line).filter(l => l != undefined));
 
-        lineIndex.removeFromSearch( foundHoles )
+        lineIndex.removeFromSearch(foundHoles);
+        lineIndex.removeFromSearch(concatPoly)
 
         // const removed = arrayRemoveObjects(holeCandidates, ...foundHoles)
         // if (dbg >= 2) console.log("removed hole candidates:" + removed )
     })
-    
+
 
     const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32]
     const fullTileCW = [-32, -32, 4128, -32, 4128, 4128, -32, 4128, -32, -32]
 
-    // handle remaining low holes which do not belong to any known polygon
-    const holeCandidates = lineIndex.getHoleCandidates(); //[...innerLowPolygonsCW].filter(l => !l.isTiny)
+
+
+    // these should be empty now
+    const remainingTops = lineIndex.getTopCandidates()
+
+    // handle remaining holes (not conatined in any high polygon). they are contained in a fulltile polygon that will be created
+    const fullTileHoles = lineIndex.getHoleCandidates();
     try {
-        if (holeCandidates.length > 0) {
+        if (fullTileHoles.length > 0) {
 
             // holes inside other polygons on this level
-            if (dbg >= 1) console.log("uncontained holes(low/cw): ", holeCandidates)
+            if (dbg >= 1) console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles))
 
             // check preconditions
-            if (innerHighPolygons.length > 0) throw new Error(`innerPolys LOW (${holeCandidates.length}) + inner HIGH (${innerHighPolygons.length}), not handled `)
+            if (remainingTops.length > 0) throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled tops(${remainingTops.length}), not handled `)
 
             // these cases are not handled correctly, must be holes in other polygons
             //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
-            if (lineIndex.remainCount > 0) throw new Error(`innerPolys LOW (${holeCandidates.length}) +  remainCount: ${lineIndex.remainCount}`)
+            if (lineIndex.remainCount > 0) throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainCount: ${lineIndex.remainCount}`)
 
-            // special case that is handled - closed inner polys, with LOWER terrain, must be holes in full tile
-            const fullTileHolesLines = lineIndex.inner.filter(l => l.line).map(l => l.line) as LineDefinition[]
             // add as holes to full tile poly
-            if (dbg >= 1) console.log("innerPolys LOW: addFullTile + holes: ", { fullTileCCW, fullTileHolesLines })
+            if (dbg >= 1) console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `, { fullTileCCW })
 
-            newLines.push(fullTileCCW, ...fullTileHolesLines);
-            lineIndex.inner = [];
+            newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line) as LineDefinition[]);
+            lineIndex.removeFromSearch(fullTileHoles)
 
         }
 
     } catch (e) {
         console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString())
         console.log(e)
-        console.log({ innerHighPolygons, holeCandidates })
+        console.log({ tops: lineArrayToStrings(remainingTops), holes: lineArrayToStrings(fullTileHoles) });
         console.log("----------------- ")
     }
 
 
-
-    // add inner holes with HIGH terrain
-    if (innerHighPolygons.length > 0) {
-        if (dbg >= 1) console.log("innerPolys - high(ccw): ", innerHighPolygons)
-
-        innerHighPolygons.forEach(l => {
-            if (l.line) newLines.push(l.line);
-        })
-
-        lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
+    const remainingInnerRingsHigh = lineIndex.getTopCandidates();
+    // add remaining TOP-rings (that have not been added before)
+    if (remainingInnerRingsHigh.length > 0) {
+        if (dbg >= 1)
+            console.log("remainingInnerRingsHigh: ", lineArrayToStrings(remainingInnerRingsHigh));
+        remainingInnerRingsHigh.forEach(l => {
+            if (l.line)
+                newLines.push(l.line);
+            lineIndex.removeFromSearch(l)
+        });
+        //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
     }
+
+    // lineIndex should be completely Empty
 
 
     const rem = lineIndex.getRemaining();
     if (rem.length) {
         console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length)
+        console.error(lineIndex.debugIndex())
+        throw new Error("lineIndex at end not empty: "+ tileInfo.coordString() );
     }
     rem.forEach(l => {
         console.log("- add remaining line: ", l.line)
