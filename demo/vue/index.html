@@ -1,0 +1,66 @@
+<script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+       
+      }
+    }
+</script>
+
+<div id="app">
+    <map-page></map-page>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@^5.3.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/vue@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue3-sfc-loader/dist/vue3-sfc-loader.js"></script>
+
+<!--
+<script src="./mapcontour.index.js"></script>
+-->
+
+<script src="../../dist/index.js"></script>
+
+<script src="./maptiler.js"></script>
+<script src="./my-contour.js"></script>
+<script src="./my-layers.js"></script>
+<script src="./my-basemap.js"></script>
+<script src="./contour-map.js"></script>
+
+<script type="module">
+ 
+  
+
+  const options = {
+      moduleCache: {
+        vue: Vue
+      },
+      async getFile(url) {
+        
+        const res = await fetch(url);
+        if ( !res.ok )
+          throw Object.assign(new Error(res.statusText + ' ' + url), { res });
+        return {
+          getContentData: asBinary => asBinary ? res.arrayBuffer() : res.text(),
+        }
+      },
+      addStyle(textContent) {
+
+        const style = Object.assign(document.createElement('style'), { textContent });
+        const ref = document.head.getElementsByTagName('style')[0] || null;
+        document.head.insertBefore(style, ref);
+      },
+    }
+
+    const { loadModule } = window['vue3-sfc-loader'];
+
+const app = Vue.createApp({
+  components: {
+    'my-component': Vue.defineAsyncComponent( () => loadModule('./myComponent.vue', options) ),
+    'map-page': Vue.defineAsyncComponent( () => loadModule('./map.vue', options) )
+  },
+  
+});
+
+app.mount('#app');
+</script>
