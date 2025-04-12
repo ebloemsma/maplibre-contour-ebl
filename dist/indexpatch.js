@@ -661,12 +661,12 @@
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
         constructor(lines, minXY, maxXY) {
-            this.finalPool = [];
+            //finalPool: TiledLine[] = [];
             this.filtered = [];
             this.inner = [];
             this.lineIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
             this.origIndex = this.createLineEdgeIndexFromLines(lines, minXY, maxXY);
-            this.finalPool = [];
+            //this.finalPool = [];
             const lineObjects = lines.map(l => {
                 return new TiledLine(l, minXY, maxXY);
             });
@@ -874,10 +874,10 @@
                 return list.e;
             throw new Error("get: invalid startOrEnd: " + startOrEnd);
         }
-        addToFinal(line) {
-            this.finalPool.push(line);
-            // console.log( "FINAL add:",line ) 
-        }
+        // addToFinal(line: TiledLine) {
+        //     this.finalPool.push(line)
+        //     // console.log( "FINAL add:",line ) 
+        // }
         debugIndexOrig() {
             return this.debugIndexDB(this.origIndex);
         }
@@ -1173,6 +1173,7 @@
         if (!lines || lines.length < 1)
             return [];
         const newLines = [];
+        const concatedPolygonsArray = [];
         // SET-DBG convertTileIsolinesToPolygons 
         //const dbg = Number(`${ tileInfo.isTile(null,329,713)?"1":"0" }`);
         const dbg = Number(`${0}`);
@@ -1241,21 +1242,20 @@
                 nextAppendLine = nextLine;
             }
             const concatedLine = lineIndex.createConcatedLine(line, appendingLines, minXY, maxXY);
-            lineIndex.addToFinal(concatedLine);
+            concatedPolygonsArray.push(concatedLine);
+            //lineIndex.addToFinal(concatedLine)
             lineIndex.removeFromSearch(line);
             appendingLines.forEach(l => lineIndex.removeFromSearch(l));
             line = lineIndex.getFirst();
         }
-        console.log("- closed lines result: ", lineArrayToStrings(lineIndex.finalPool));
-        lineIndex.finalPool.forEach(l => {
+        console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+        concatedPolygonsArray.forEach(l => {
             // console.log(l.line)
             if (l.line) {
                 testPolyContainsInner(l, innerLowPolygonsCW);
                 newLines.push(l.line);
             }
         });
-        if (dbg >= 1)
-            console.log("- finalLines: ", { finalPoolLen: lineIndex.finalPool.length });
         if ((dbg >= 1) && lineIndex.inner.length > 0) {
             console.log("innerPolys: ", lineIndex.inner);
         }
@@ -1274,8 +1274,7 @@
                 if (innerHighPolygons.length > 0)
                     throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + inner HIGH (${innerHighPolygons.length}), not handled `);
                 // these cases are not handled correctly, must be holes in other polygons
-                if (lineIndex.finalPool.length > 0)
-                    throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `);
+                //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
                 if (lineIndex.remainCount > 0)
                     throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) +  remainCount: ${lineIndex.remainCount}`);
                 // special case that is handled - closed inner polys, with LOWER terrain, must be holes in full tile
