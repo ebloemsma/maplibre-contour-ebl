@@ -1220,23 +1220,23 @@
                 //console.log("WARN: appendLoop has reached init line count");
                 //}
                 //the next line which end is on the edge can be appended
-                let nextLine = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
-                if (!nextLine) {
+                let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
+                if (!nextAppendCandidate) {
                     console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
                     break;
                 }
-                const nextIsSame = currentEdgeLine.isIdentical(nextLine);
+                const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate);
                 if (nextIsSame) {
                     if (dbg >= 2)
                         console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
                     break;
                 }
-                if (nextLine) {
+                if (nextAppendCandidate) {
                     if (dbg >= 2)
-                        console.log(`close line(${i} - append line:`, nextLine);
-                    linesToAppend.push(nextLine);
+                        console.log(`close line(${i} - append line:`, nextAppendCandidate);
+                    linesToAppend.push(nextAppendCandidate);
                 }
-                currentAppendCandidateLine = nextLine;
+                currentAppendCandidateLine = nextAppendCandidate;
             }
             const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
             concatedPolygonsArray.push(concatedLine);
