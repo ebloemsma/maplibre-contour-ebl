@@ -631,11 +631,43 @@
         constructor(line, minXY, maxXY) {
             this.done = false;
             if (line) {
-                this.line = [...line],
-                    this.update(minXY, maxXY);
+                this.line = [...this.fixLineEnds(line)];
+                this.update(minXY, maxXY);
                 this.minXY = minXY;
                 this.maxXY = maxXY;
             }
+        }
+        /**
+         *
+         * @param value
+         * @returns
+         */
+        fixInvalidLineEnd(value) {
+            //return value;
+            if (value == 0)
+                return -32;
+            if (value == 4096)
+                return 4128;
+            return value;
+        }
+        /**
+         * fixes line ends for tiles for which neighbours are not available and so no overlap data.
+         * they do not end at 4128/-32 but at 0,4096.
+         *
+         * @param line
+         * @returns
+         */
+        fixLineEnds(line) {
+            const l = line.length;
+            line[0];
+            line[0 + 1];
+            line[l - 2];
+            line[l - 1];
+            line[0] = this.fixInvalidLineEnd(line[0]);
+            line[0 + 1] = this.fixInvalidLineEnd(line[0 + 1]);
+            line[l - 2] = this.fixInvalidLineEnd(line[l - 2]);
+            line[l - 1] = this.fixInvalidLineEnd(line[l - 1]);
+            return line;
         }
         update(minXY, maxXY) {
             if (!this.line)
@@ -1251,9 +1283,12 @@
      * @param maxXY
      * @returns
      */
-    function convertTileIsolinesToPolygons(lvl, lines, tileInfo) {
-        if (!lines || lines.length < 1)
+    function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
+        const lines = linesIn.filter(l => l.length > 6);
+        if (!lines || lines.length < 1) {
+            console.log("Tile w/o lines: " + tileInfo.coordString());
             return [];
+        }
         const newLines = [];
         const concatedPolygonsArray = [];
         // SET-DBG convertTileIsolinesToPolygons 
@@ -1302,24 +1337,30 @@
                 //if (appendLoopCount == initLineCount-1) {
                 //console.log("WARN: appendLoop has reached init line count");
                 //}
-                //the next line which end is on the edge can be appended
-                let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
-                if (!nextAppendCandidate) {
-                    console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
-                    break;
+                try {
+                    //the next line which end is on the edge can be appended
+                    let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
+                    if (!nextAppendCandidate) {
+                        console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
+                        break;
+                    }
+                    const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate);
+                    if (nextIsSame) {
+                        if (dbg >= 2)
+                            console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
+                        break;
+                    }
+                    if (nextAppendCandidate) {
+                        if (dbg >= 2)
+                            console.log(`close line(${i} - append line:`, nextAppendCandidate);
+                        linesToAppend.push(nextAppendCandidate);
+                    }
+                    currentAppendCandidateLine = nextAppendCandidate;
                 }
-                const nextIsSame = currentEdgeLine.isIdentical(nextAppendCandidate);
-                if (nextIsSame) {
-                    if (dbg >= 2)
-                        console.log(`close line(${i} END self reached, append-count: ${linesToAppend.length}`);
-                    break;
+                catch (error) {
+                    console.error("currentAppendCandidateLine", currentAppendCandidateLine);
+                    console.error(error);
                 }
-                if (nextAppendCandidate) {
-                    if (dbg >= 2)
-                        console.log(`close line(${i} - append line:`, nextAppendCandidate);
-                    linesToAppend.push(nextAppendCandidate);
-                }
-                currentAppendCandidateLine = nextAppendCandidate;
             }
             const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
             concatedPolygonsArray.push(concatedLine);
@@ -1794,9 +1835,6 @@
                 }
             }
         }
-        //console.log( fullTile.toString() )
-        //const { edgeMin, edgeMax } = ispolygons.findTileEdgeMinMax(tile)
-        //console.log("segm", segments)
         if (dbg == "1")
             console.log(fullTile.toString());
         // ISOPOLY: convert lines to polygons
@@ -3686,7 +3724,7 @@
             });
         }
         fetchContourTile(z, x, y, options, parentAbortController, timer) {
-            const { levels, intervals, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", intervalKey = "intervalIndex", subsampleBelow = 100, } = options;
+            const { levels, intervals, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", deltaKey = "delta", intervalKey = "intervalIndex", subsampleBelow = 100, } = options;
             // console.log(`FETCH options`, options)
             // no levels means less than min zoom with levels specified
             if ((!intervals || intervals.length === 0) && (!levels || levels.length === 0)) {
@@ -3744,14 +3782,15 @@
                                     [elevationKey]: ele,
                                     [intervalKey]: (intervals) ? Math.max(...intervals.map((l, i) => (ele % l === 0 ? i : 0))) : 0,
                                 };
-                                //ISOPOLYS: calc delta value and extend props
-                                const deltaAlt = (options.deltaReference != undefined) ? ele - options.deltaReference : undefined;
+                                //POLYGONS: calc delta value and extend props
+                                const deltaAlt = (options.deltaBaseAltitude != undefined) ? ele - options.deltaBaseAltitude : undefined;
                                 const deltaProps = (deltaAlt != undefined) ? {
-                                    delta: deltaAlt,
+                                    [deltaKey]: deltaAlt,
                                 } : {};
-                                const levelDef = (_a = options.levelDef) === null || _a === undefined ? undefined : _a.find(e => Number(e.level) == ele);
-                                const levelProps = (levelDef) ? levelDef.props : {};
-                                const properties = Object.assign(baseProps, deltaProps, levelProps);
+                                // get optional custom props from config
+                                const countourDefintion = (_a = options.contours) === null || _a === undefined ? undefined : _a.find(e => Number(e.atElevation) == ele);
+                                const customProps = (countourDefintion) ? countourDefintion.addProperties : {};
+                                const properties = Object.assign(baseProps, deltaProps, customProps);
                                 // console.log(properties)
                                 return {
                                     type: geomType,
