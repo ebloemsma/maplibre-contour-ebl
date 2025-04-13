@@ -1747,6 +1747,10 @@
                 if (isoOptions.levels) {
                     isoLevels = createLevelsSet(min, max, isoOptions.levels);
                 }
+                else if (isoOptions.contours) {
+                    const levels = isoOptions.contours.map(contourDef => contourDef.atElevation);
+                    isoLevels = createLevelsSet(min, max, levels);
+                }
                 else if (isoOptions.intervals) {
                     const intervals = isoOptions.intervals;
                     isoLevels = createLevelsInterval(min, max, intervals[0]);
