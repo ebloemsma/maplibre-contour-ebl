@@ -168,6 +168,7 @@ export class LocalDemManager implements DemManager {
     timer?: Timer,
   ): Promise<ContourTile> {
     const {
+      contours,
       levels,
       intervals,
       multiplier = 1,
@@ -175,6 +176,7 @@ export class LocalDemManager implements DemManager {
       extent = 4096,
       contourLayer = "contours",
       elevationKey = "ele",
+      deltaKey = "delta",
       intervalKey = "intervalIndex",
       subsampleBelow = 100,
     } = options;
@@ -183,7 +185,7 @@ export class LocalDemManager implements DemManager {
     
 
     // no levels means less than min zoom with levels specified
-    if ( (!intervals || intervals.length === 0) && (! levels || levels.length === 0) ) {
+    if ( (!intervals || intervals.length === 0) && (! levels || levels.length === 0) && (!contours || contours.length === 0)) {
       return Promise.resolve({ arrayBuffer: new ArrayBuffer(0) });
     }
 
@@ -266,16 +268,17 @@ export class LocalDemManager implements DemManager {
                     [intervalKey]: (intervals)?Math.max(...intervals.map((l, i) => (ele % l === 0 ? i : 0))) : 0,
                 }
 
-                //ISOPOLYS: calc delta value and extend props
-                const deltaAlt = (options.deltaReference!=undefined) ? ele - options.deltaReference : undefined ;
+                //POLYGONS: calc delta value and extend props
+                const deltaAlt = (options.deltaBaseAltitude!=undefined) ? ele - options.deltaBaseAltitude : undefined ;
                 const deltaProps = (deltaAlt!=undefined)? {
-                    delta: deltaAlt,
+                    [deltaKey]: deltaAlt,
                 }:{}
 
-                const levelDef = options.levelDef?.find( e => Number(e.level)==ele )
-                const levelProps = (levelDef)?levelDef.props:{}
+                // get optional custom props from config
+                const countourDefintion = options.contours?.find( e => Number(e.contourElevation)==ele )
+                const customProps = (countourDefintion)?countourDefintion.addProperties:{}
 
-                const properties = Object.assign( baseProps, deltaProps,levelProps)
+                const properties = Object.assign( baseProps, deltaProps,customProps)
                 // console.log(properties)
 
                 return {

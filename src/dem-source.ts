@@ -227,6 +227,8 @@ export class DemSource {
       const [z, x, y] = this.parseUrl(request.url);
       const reqOptions = decodeOptions(request.url);
 
+      
+
       //POLYLINES      
       let overrideOptions = null;
       if (this.GetOptions) {

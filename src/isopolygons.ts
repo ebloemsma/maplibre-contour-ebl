@@ -349,15 +349,6 @@ export function analyzePolygon(coords) {
     const absoluteArea = Math.abs(signedArea);
     const winding = signedArea < 0 ? 'ccw' : 'cw';
 
-    //const isTiny = absoluteArea < 50*50;
-    // let min = Infinity;
-    // let max = -Infinity;
-    // iteratePointsInsidePolygon(coords, (x, y) => {
-    //     const elev = tile.get(x,y)
-    //     min = Math.min(min, elev)
-    //     max = Math.max(max, elev)
-    // })
-
     return {
         //isTiny,
         signedArea,
@@ -396,7 +387,7 @@ class TiledLine {
     constructor(line, minXY, maxXY) {
         this.done = false
         if (line) {
-            this.line = [...this.fixLine(line)]
+            this.line = [...this.fixLineEnds(line)]
             this.update(minXY, maxXY)
             this.minXY = minXY;
             this.maxXY = maxXY;
@@ -405,7 +396,12 @@ class TiledLine {
 
     }
 
-    fixBorderCoord(value) {
+    /**
+     * 
+     * @param value 
+     * @returns 
+     */
+    fixInvalidLineEnd(value) {
         //return value;
 
         if (value == 0) return -32;
@@ -413,17 +409,24 @@ class TiledLine {
         return value
     }
 
-    fixLine(line) {
+    /**
+     * fixes line ends for tiles for which neighbours are not available and so no overlap data.
+     * they do not end at 4128/-32 but at 0,4096.
+     * 
+     * @param line 
+     * @returns 
+     */
+    fixLineEnds(line) {
         const l = line.length;
         let sx = line[0];
         let sy = line[0 + 1];
         let ex = line[l - 2];
         let ey = line[l - 1];
 
-        line[0] = this.fixBorderCoord(line[0])
-        line[0 + 1] = this.fixBorderCoord(line[0 + 1])
-        line[l - 2] = this.fixBorderCoord(line[l - 2])
-        line[l - 1] = this.fixBorderCoord(line[l - 1])
+        line[0] = this.fixInvalidLineEnd(line[0])
+        line[0 + 1] = this.fixInvalidLineEnd(line[0 + 1])
+        line[l - 2] = this.fixInvalidLineEnd(line[l - 2])
+        line[l - 1] = this.fixInvalidLineEnd(line[l - 1])
 
         return line;
     }

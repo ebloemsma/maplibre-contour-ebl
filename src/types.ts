@@ -55,6 +55,10 @@ export interface ContourTileOptions {
   elevationKey?: string;
   /** Key for the "interval" property to set on each contour line. Minor lines have key=0, major have key=1 */
   intervalKey?: string;
+
+  /** key of "delta" property (use with option "deltaBaseAltitude") to add elevation delta */
+  deltaKey?: string;
+
   /** Name of the vector tile layer to put contour lines in */
   contourLayer?: string;
   /** Grid size of the vector tile (default 4096) */
@@ -63,6 +67,11 @@ export interface ContourTileOptions {
   buffer?: number;
   /** When overzooming tiles, subsample to scale up to at least this size to make the contour lines smoother at higher zooms. */
   subsampleBelow?: number;
+
+   // will calc each layers elevation diff to this value and add it as property
+   deltaBaseAltitude? : number,
+   
+   polygons? : boolean,
 
   intervals?: number [];
 }
@@ -80,16 +89,20 @@ export interface GlobalContourTileOptions extends ContourTileOptions {
   
 }
 
+// to define contour layer at vertain elevation. addProperties will be passed on to rendered layer
+export type CountourDefinition =  {
+  contourElevation: number,
+  addProperties?: Record<string,any>
+}
+
+
 export interface IsolineOptions  {
   intervals?: number [];
   min? : number;
   levels?: number [],
-  levelDef?: [{
-    level: number,
-    props: Record<string,any>
-  }]
-  deltaReference? : number,
-  polygons? : boolean,
+  // to render layers at certain values. cannot be mixed with thresholds
+  contours?: CountourDefinition [],
+
 }
 
 export interface IndividualContourTileOptions extends ContourTileOptions,IsolineOptions {

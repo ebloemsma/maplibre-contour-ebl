@@ -20,7 +20,7 @@ THIS SOFTWARE.
 import * as ispolygons from './isopolygons';
 
 import type { HeightTile } from "./height-tile";
-import type { IsolineOptions } from './types';
+import type { IndividualContourTileOptions, IsolineOptions } from './types';
 
 class Fragment {
   start: number;
@@ -180,7 +180,7 @@ function ratio(a: number, b: number, c: number) {
  * contour lines in tile coordinates
  */
 export default function generateIsolines(
-  isoOptions: IsolineOptions,
+  isoOptions: IndividualContourTileOptions,
   tile: HeightTile,
   extent: number = 4096,
   buffer: number = 1,
@@ -196,20 +196,19 @@ export default function generateIsolines(
   const fragmentByStartByLevel: Map<number, Map<number, Fragment>> = new Map();
   const fragmentByEndByLevel: Map<number, Map<number, Fragment>> = new Map();
 
-  
 
   //ISOPOLYS: need this to identify edges
 
-  const dbg:string=`${0}`;
-  
+  const dbg: string = `${0}`;
+
   const minXY = multiplier * (0 - 1);
   const maxXY = 4096 + Math.abs(minXY);
   const fullTile: ispolygons.TileInformation = new ispolygons.TileInformation(z, x, y, tile);
   fullTile.minXY = minXY;
   fullTile.maxXY = maxXY;
 
-  if(dbg=="1") console.log(`genIsolines: ${z}/${y}/${x} `)
-  
+  if (dbg == "1") console.log(`genIsolines: ${z}/${y}/${x} `)
+
 
   function interpolate(
     point: [number, number],
@@ -237,20 +236,20 @@ export default function generateIsolines(
     }
   }
 
-  function createLevelsSet( min, max, levelSet ){
-      return levelSet.filter( l=> l >= min && l <= max);
+  function createLevelsSet(min, max, levelSet) {
+    return levelSet.filter(l => l >= min && l <= max);
   }
 
-  function createLevelsInterval( min, max, interval, filterCb? : Function ){
-      const start = Math.ceil(min / interval) * interval;
-      const end = Math.floor(max / interval) * interval;
+  function createLevelsInterval(min, max, interval, filterCb?: Function) {
+    const start = Math.ceil(min / interval) * interval;
+    const end = Math.floor(max / interval) * interval;
 
-      const _levels  : number[]= [];            
-      for ( let threshold = start; threshold <= end; threshold += interval ){
-          if( filterCb && !filterCb(threshold) ) continue;
-          _levels.push( threshold )
-      }
-      return _levels;
+    const _levels: number[] = [];
+    for (let threshold = start; threshold <= end; threshold += interval) {
+      if (filterCb && !filterCb(threshold)) continue;
+      _levels.push(threshold)
+    }
+    return _levels;
   }
 
   // Most marching-squares implementations (d3-contour, gdal-contour) make one pass through the matrix per threshold.
@@ -287,28 +286,24 @@ export default function generateIsolines(
       //fullTile.setMin(minElev)
       //convertTileIsolinesToPolygonsfullTile.setMin(minElev)
 
-      let isoLevels : number[] | undefined = undefined;
-      if ( isoOptions.levels) {
-          isoLevels =  createLevelsSet(min,max,isoOptions.levels)
-      } else if ( isoOptions.intervals) {
-          const intervals= isoOptions.intervals;
-          isoLevels =  createLevelsInterval(min,max,intervals[0])
+      let isoLevels: number[] | undefined = undefined;
+      if (isoOptions.levels) {
+        isoLevels = createLevelsSet(min, max, isoOptions.levels)
+      } else if (isoOptions.contours) {
+        const levels = isoOptions.contours.map(contourDef => contourDef.contourElevation)
+        isoLevels = createLevelsSet(min, max, levels)
+      } else if (isoOptions.intervals) {
+        const intervals = isoOptions.intervals;
+        isoLevels = createLevelsInterval(min, max, intervals[0])
       } else {
-          throw new Error("no levels, interval set");
+        throw new Error("no levels, interval set");
       }
 
-      if(!isoLevels) throw new Error("levels is undefined")
+      if (!isoLevels) throw new Error("levels is undefined")
 
-      if(isoOptions.min!=null) isoLevels = isoLevels.filter( l => l >= (isoOptions.min ?? -Infinity) )
-      
-
-      //const levelStart = ( lowCutout!= undefined) ? Math.max(start,lowCutout) : start;
-      //const isoLevels = createLevels( start ,end, isoOptions )
-      //console.log("isoLevels",isoLevels)
+      if (isoOptions.min != null) isoLevels = isoLevels.filter(l => l >= (isoOptions.min ?? -Infinity))
 
       for (let threshold of isoLevels) {
-
-        // if ( lowCutout != undefined && threshold < lowCutout ) continue;
 
         const tl = tld > threshold;
         const tr = trd > threshold;
@@ -386,38 +381,43 @@ export default function generateIsolines(
     }
   }
 
-  //console.log( fullTile.toString() )
+  if (dbg == "1") console.log(fullTile.toString())
 
-  //const { edgeMin, edgeMax } = ispolygons.findTileEdgeMinMax(tile)
+  if (isoOptions.polygons) {
 
-  //console.log("segm", segments)
+    if (!isoOptions.contours) {
+      throw new Error("polygons only possible with countours or levels defined")
+    }
 
-  if(dbg=="1")  console.log(fullTile.toString())
-
-  // ISOPOLY: convert lines to polygons
-  if ( isoOptions.polygons ) {
-    
+    // generate iso-polygons from isolines 
+    // only works with contours or levels set not with intervals   
     try {
       const isoPolygonsMap: ispolygons.ElevationLinesMap = {};
 
       for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
-        // const levelIsoLines = segments[elevationLevel]
         const polys = ispolygons.convertTileIsolinesToPolygons(elevationLevel, elevationIsoLines, fullTile);
-        if(polys.length>0) isoPolygonsMap[elevationLevel] = polys;
+        if (polys.length > 0) isoPolygonsMap[elevationLevel] = polys;
       }
-      if(dbg=="1")  console.log("isoPolygonsMap",isoPolygonsMap );
+      if (dbg == "1") console.log("isoPolygonsMap", isoPolygonsMap);
 
       // generate full tile polys
-      const levels = isoOptions.levels;
+      let levels;
+      if (isoOptions.levels) {
+        levels = isoOptions.levels
+      } else if (isoOptions.contours) {
+        levels = isoOptions.contours.map(contourDef => contourDef.contourElevation)
+      } else {
+        throw new Error("no levels, contours set");
+      }
+
       const fullTilePolys = ispolygons.generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z)
       if (Object.keys(fullTilePolys).length) {
         // console.log("fullTilePolys",fullTilePolys );
-        if(dbg=="1")  console.log(`- fullTilePolys`, fullTilePolys)
+        if (dbg == "1") console.log(`- fullTilePolys`, fullTilePolys)
       }
       const mergedPolys = mergeElevationMaps(isoPolygonsMap, fullTilePolys)
 
-
-      if(dbg=="1")  console.log("- mergedPolys:",mergedPolys);
+      if (dbg == "1") console.log("- mergedPolys:", mergedPolys);
       return mergedPolys;
 
     } catch (e) {
@@ -427,16 +427,14 @@ export default function generateIsolines(
 
     const isos = {};
     for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
-        // const levelIsoLines = segments[elevationLevel]
-        const lineIndex = new ispolygons.LineIndex(elevationIsoLines, minXY, maxXY);
-        if(dbg=="1") console.log("lineIndex", elevationLevel, lineIndex.debugIndex())
-        //if (polys.length > 0)
-        isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
+      // const levelIsoLines = segments[elevationLevel]
+      const lineIndex = new ispolygons.LineIndex(elevationIsoLines, minXY, maxXY);
+      if (dbg == "1") console.log("lineIndex", elevationLevel, lineIndex.debugIndex())
+      //if (polys.length > 0)
+      isos[elevationLevel] = lineIndex.toArrayAllInner(l => !l.isTiny);
     }
     return isos
-
-
-}
+  }
 
   return segments;
 }
@@ -447,28 +445,28 @@ export default function generateIsolines(
  * @param map2 
  */
 function mergeElevationMaps(map1: ispolygons.ElevationLinesMap, map2: ispolygons.ElevationLinesMap) {
-    const merged = {};
-    
-    const lowCutout = 0
+  const merged = {};
 
-    for (const [lvlStr, lines] of Object.entries(map1)) {
-        const lvl = Number(lvlStr)
-        if( lowCutout != undefined && lvl < lowCutout) continue;
-        if (!merged[lvl])
-            merged[lvl] = [];
-        //console.log("merged--",{...merged})
-        merged[lvl].push(...lines);
-    }
-    //console.log("entries",Object.entries(map2))
-    for (const [lvlStr, lines ] of Object.entries(map2)) {
-        // console.log("lvl,merged",lvl,{...merged})
-        const lvl = Number(lvlStr)
-        if(lowCutout != undefined &&  lvl < 0) continue;
-        if (!merged[lvl])
-            merged[lvl] = [];
-        //console.log("merged--",{...merged})
-        merged[lvl].push(...lines );
-    }
-    return merged;
+  const lowCutout = 0
+
+  for (const [lvlStr, lines] of Object.entries(map1)) {
+    const lvl = Number(lvlStr)
+    if (lowCutout != undefined && lvl < lowCutout) continue;
+    if (!merged[lvl])
+      merged[lvl] = [];
+    //console.log("merged--",{...merged})
+    merged[lvl].push(...lines);
+  }
+  //console.log("entries",Object.entries(map2))
+  for (const [lvlStr, lines] of Object.entries(map2)) {
+    // console.log("lvl,merged",lvl,{...merged})
+    const lvl = Number(lvlStr)
+    if (lowCutout != undefined && lvl < 0) continue;
+    if (!merged[lvl])
+      merged[lvl] = [];
+    //console.log("merged--",{...merged})
+    merged[lvl].push(...lines);
+  }
+  return merged;
 
 }
