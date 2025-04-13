@@ -6,8 +6,8 @@
   <title>Display a map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
-  <!--<script src="../_dist/index.js"></script>-->
-  <script src="./index.js"></script>
+  <script src="../../dist/indexpatch.js"></script>
+  <!--<script src="./index.js"></script>-->
   <script src="./utils.js"></script>
   <script src="./maptiler.js"></script>
 
@@ -35,12 +35,13 @@
       padding: 10px;
     }
 
+    /*
     .legend {
       position: absolute; background-color: white; height: 100px; width: 100px; right: 20px; top: 20px;
       border: 1px solid black;
       display:none;
     }
-
+*/
     .map-overlay .map-overlay-inner {
       background-color: #fff;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -92,7 +93,7 @@
   <div class="map-overlay top">
     <div class="map-overlay-inner">
       <fieldset>
-        <label for="layer">Current Altitude: [<span id="setAlt"></span>]</label>
+        <label for="layer">Base Altitude: [<span id="setAlt"></span>]</label>
         <select id="layer" name="layer" _onChange="selectLayer(e)">
           <option value="17000">17000</option>
           <option value="15000">15000</option>
@@ -102,9 +103,9 @@
           <option value="6000">6000</option>
           <option value="4000">4000</option>
           <option value="3000">3000</option>
-          <option value="2500" selected>2500</option>
+          <option value="2500" >2500</option>
           <option value="2000">2000</option>
-          <option value="1000">1000</option>
+          <option value="1000" selected>1000</option>
           <option value="500">500</option>
           <option value="200">200</option>
           <option value="0">0</option>
@@ -117,75 +118,78 @@
 
     </div>
   </div>
-  <div id="legend" class="legend" ></div>
+  
   <script>
 
+    /** setup DEM countour provider in maplibre */
+
+    // use online mapzen tiles
     const demTileServerBaseUrl = TILESERVER_AWS
     // const demTileServerBaseUrl = getLocalTileServerUrl("seattle-z10-mz");
-
     const demSource = new mlcontour.DemSource({
       url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
-      //url: "http://localhost:8080/services/seattle-mz/tiles/{z}/{x}/{y}.png", 
       encoding: "terrarium",
-      maxzoom: 12,
-      minzoom: 5,
-
-
+      maxzoom: 15,
+      minzoom: 4,
     });
     // calls maplibregl.addProtocol for the shared cache and contour protocols
     demSource.setupMaplibre(maplibregl);
 
-    let baseAltitude = 500;
 
-    const rLevels = [
+    /** setup contours */
+
+    // set  altitude of first and subsequent layers (relative)
+    let baseAltitude = 1000;
+    const layerSteps = [
       3000,
       2500,
       2000,
       1500,
       1000,
-      500
+      500,
+      0
     ]
 
-    function createTerrainCfg(baseAltitude) {
-      const levels = rLevels.map(k => Number(k)).sort((a, b) => a - b).map(relLvl => [relLvl, relLvl + baseAltitude])
-       
-      const result = [];
-      let lvlIndex=-1
-      for (let [rele, ele] of levels) {
-        lvlIndex+=1
-        const lvlColor = getBrownShade(lvlIndex)
-        const value = {
-          level: ele,
-          props: {
-            relEle: rele,
-            terrEle: ele,
-            lvlIndex ,
-            lvlColor
+    // dynamically create actual contour config 
+    function createLayerCfg(baseAltitude) {
+
+      // sorted array of levels and relative altitude from base
+      
+      const config = [];
+      let layerIndex=-1
+
+      for (const layerRelativeElevation of layerSteps.map(k => Number(k)).sort((a, b) => a - b)) {
+        layerIndex+=1  
+        const layerDefintition = {
+          contourElevation: layerRelativeElevation + baseAltitude,
+          addProperties: {
+            relEle: layerRelativeElevation, // relativeElevation to baseAltitude
+            //terrEle: elevation, 
+            lvlIndex: layerIndex, 
+            layerIndex, // incrementing index from ground up
+            color: getBrownShade(layerIndex)
           }
         }
-        result.push(value)
-      }
-      // console.log(result)
-      return result;
-    }
-
-    let layerConfig = createTerrainCfg(baseAltitude);
-
-    demSource.GetOptions = (tileCoords) => {
-      // const levelDef = createTerrainCfg(baseAltitude);
-      //console.log("createTerrainCfg", gpwsLevels.map(e => [e.level, e.props]))
-      const config = {
-        levels: layerConfig.map(e => e.level), //[ -300, 0,100, 400],
-        levelDef: layerConfig,
-        //intervals : [100], //levels[0]
-        polygons: true,
-        deltaReference: baseAltitude, //400,
+        config.push(layerDefintition)
       }
 
+      console.log(config)
       return config;
     }
 
+    
 
+    // callback which is called
+    demSource.GetOptions = (tileCoords) => {
+      let layerConfig = createLayerCfg(baseAltitude);
+      console.log("GetOptions",tileCoords)
+      const config = {
+        contours: layerConfig,
+        deltaBaseAltitude: baseAltitude, 
+      }
+      // console.log("GetOptions",config)
+      return config;
+    }
 
     var map = new maplibregl.Map({
       container: "map",
@@ -205,7 +209,7 @@
             type: "raster-dem",
             encoding: "terrarium",
             tiles: [demSource.sharedDemProtocolUrl], // share cached DEM tiles with contour layer
-            maxzoom: 14,
+            maxzoom: 15,
             tileSize: 256,
           },
           contourSourceFeet: {
@@ -215,13 +219,16 @@
                 // meters to feet
                 multiplier: 3.28084,
                 overzoom: 1,
-                maxFetchZoom: 10,
+                //maxFetchZoom: 13,
                 thresholds: {
                 },
+                // layer property name for actual elevation
                 elevationKey: 'ele',
+                // layer property name for actual elevation
                 intervalKey: 'level',
+                // source layer name of countour-geometries (lines or polygons)
                 contourLayer: 'contours',
-
+                polygons: true,
               })
             ],
             maxzoom: 13,
@@ -231,22 +238,14 @@
 
         layers: [
           ...maptiler.layers,
-
-
-
-
           {
+            // light transparen layers that add up 
             id: 'contourLayersAdditive',
             type: 'fill',
             source: 'contourSourceFeet',
             'source-layer': 'contours',
             paint: {
-              // 'fill-color': ['match', ['get', 'delta'], +2000, "#f00", +1000, "#f5b642", -500, "#f5e342", -1000, "#09ff00", -2000, "#99fa96", "#000"],
-              //'fill-color': ['match', ['get', 'delta'], -500, "#f5e342", "#0f0"],
-
-              // 'fill-color': ['match', ['get', 'ele'], 0, "#00f", "#0f0"],
               'fill-color': "#a3560a",
-
               'fill-opacity': 0.5,
             }
             , layout: {
@@ -255,16 +254,14 @@
           },
 
           {
+            // colored layers, use color from layer properties
             id: 'contourLayersOpaque',
             type: 'fill',
             source: 'contourSourceFeet',
             'source-layer': 'contours',
             paint: {
-              // 'fill-color': ['match', ['get', 'delta'], +2000, "#f00", +1000, "#f5b642", -500, "#f5e342", -1000, "#09ff00", -2000, "#99fa96", "#000"],
-              //'fill-color': ['match', ['get', 'delta'], -500, "#f5e342", "#0f0"],
-
-              // 'fill-color': ['match', ['get', 'ele'], 0, "#00f", "#0f0"],
-              'fill-color': ['get', 'lvlColor'],
+              // uses color set in layer property
+              'fill-color': ['get', 'color'],
               'fill-opacity': 1,
             }
             , layout: {
@@ -289,10 +286,9 @@
               'text-size': 10,
               'text-field': [
                 'concat',
-               // ['get', 'lvlColor'],
-                //""
-                //['number-format', ['get', 'lvlColor'], {}],
-                // ['number-format', ['get', 'delta'], {}],
+                   //['get', 'color']," - ",
+                   //['get', 'layerIndex']," - ",
+                   //['number-format', ['get', 'delta'], {}]," - ",
                 // '\'', ' / ',
                  ['number-format', ['get', 'ele'], {}]
               ],
@@ -306,47 +302,41 @@
         },
       },
     });
-
+    // map.showTileBoundaries = true;
 
     const selectGPWS = document.getElementById('layer');
     const setAltElement = document.getElementById('setAlt');
-
     selectGPWS.addEventListener("change", setBaseAltitude )
-
-
     var rangeInput = document.getElementById("altSlider");
     if (rangeInput.addEventListener) {
       rangeInput.addEventListener('change', setBaseAltitude );
     }
-
     function setBaseAltitude( $e ) {
       baseAltitude = Number($e.target.value)
       console.log("baseAltitude:", baseAltitude)
       setAltElement.innerHTML = baseAltitude
-      layerConfig = createTerrainCfg(baseAltitude);
-      updateLegend()
+      
+      //updateLegend()
+
       //force map-update
       map.style.sourceCaches['contourSourceFeet'].clearTiles()
       map.style.sourceCaches['contourSourceFeet'].update(map.transform)
     };
 
-    function updateLegend(){
-        const element = document.getElementById("legend")
-        console.log(layerConfig)
-    }
+    // function updateLegend(){
+    //     const element = document.getElementById("legend")
+    //     console.log(layerConfig)
+    // }
 
     map.on("click", e => {
       console.log(e.lngLat)
-
       const meter2Feet = 3.28084;
       const elevationMeters = map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
       const elevationFeet = elevationMeters * meter2Feet
-
       const zoom = map.getZoom()
-
       console.log({ zoom, elevationMeters, elevationFeet })
     })
-    // map.showTileBoundaries = true;
+    
 
 
   </script>
