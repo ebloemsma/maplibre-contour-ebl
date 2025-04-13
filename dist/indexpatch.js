@@ -2005,6 +2005,13 @@
                 case "thresholds":
                     v = decodeThresholds(v);
                     break;
+                case "polygons":
+                    v = ("true" === v);
+                    break;
+                // number 
+                case "maxFetchZoom":
+                case "deltaBaseAltitude":
+                case "extent":
                 case "extent":
                 case "multiplier":
                 case "overzoom":
