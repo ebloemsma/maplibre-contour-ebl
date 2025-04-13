@@ -1748,7 +1748,7 @@
                     isoLevels = createLevelsSet(min, max, isoOptions.levels);
                 }
                 else if (isoOptions.contours) {
-                    const levels = isoOptions.contours.map(contourDef => contourDef.atElevation);
+                    const levels = isoOptions.contours.map(contourDef => contourDef.contourElevation);
                     isoLevels = createLevelsSet(min, max, levels);
                 }
                 else if (isoOptions.intervals) {
@@ -1841,12 +1841,15 @@
         }
         if (dbg == "1")
             console.log(fullTile.toString());
-        // ISOPOLY: convert lines to polygons
         if (isoOptions.polygons) {
+            if (!isoOptions.contours) {
+                throw new Error("polygons only possible with countours or levels defined");
+            }
+            // generate iso-polygons from isolines 
+            // only works with contours or levels set not with intervals   
             try {
                 const isoPolygonsMap = {};
                 for (const [elevationLevel, elevationIsoLines] of Object.entries(segments)) {
-                    // const levelIsoLines = segments[elevationLevel]
                     const polys = convertTileIsolinesToPolygons(elevationLevel, elevationIsoLines, fullTile);
                     if (polys.length > 0)
                         isoPolygonsMap[elevationLevel] = polys;
@@ -1854,7 +1857,16 @@
                 if (dbg == "1")
                     console.log("isoPolygonsMap", isoPolygonsMap);
                 // generate full tile polys
-                const levels = isoOptions.levels;
+                let levels;
+                if (isoOptions.levels) {
+                    levels = isoOptions.levels;
+                }
+                else if (isoOptions.contours) {
+                    levels = isoOptions.contours.map(contourDef => contourDef.contourElevation);
+                }
+                else {
+                    throw new Error("no levels, contours set");
+                }
                 const fullTilePolys = generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z);
                 if (Object.keys(fullTilePolys).length) {
                     // console.log("fullTilePolys",fullTilePolys );
@@ -3728,10 +3740,10 @@
             });
         }
         fetchContourTile(z, x, y, options, parentAbortController, timer) {
-            const { levels, intervals, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", deltaKey = "delta", intervalKey = "intervalIndex", subsampleBelow = 100, } = options;
+            const { contours, levels, intervals, multiplier = 1, buffer = 1, extent = 4096, contourLayer = "contours", elevationKey = "ele", deltaKey = "delta", intervalKey = "intervalIndex", subsampleBelow = 100, } = options;
             // console.log(`FETCH options`, options)
             // no levels means less than min zoom with levels specified
-            if ((!intervals || intervals.length === 0) && (!levels || levels.length === 0)) {
+            if ((!intervals || intervals.length === 0) && (!levels || levels.length === 0) && (!contours || contours.length === 0)) {
                 return Promise.resolve({ arrayBuffer: new ArrayBuffer(0) });
             }
             const key = [z, x, y, encodeIndividualOptions(options)].join("/");
@@ -3792,7 +3804,7 @@
                                     [deltaKey]: deltaAlt,
                                 } : {};
                                 // get optional custom props from config
-                                const countourDefintion = (_a = options.contours) === null || _a === undefined ? undefined : _a.find(e => Number(e.atElevation) == ele);
+                                const countourDefintion = (_a = options.contours) === null || _a === undefined ? undefined : _a.find(e => Number(e.contourElevation) == ele);
                                 const customProps = (countourDefintion) ? countourDefintion.addProperties : {};
                                 const properties = Object.assign(baseProps, deltaProps, customProps);
                                 // console.log(properties)
