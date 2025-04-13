@@ -1,5 +1,12 @@
-dist
-dist - Kopie
+dist/staging
+dist/index.js
+dist/index.cjs
+dist/index.mjs
+dist/index.min.js
+dist/*.ts
+
+
+dist_patch
 node_modules
 logs
 *.log
