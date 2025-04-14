@@ -757,13 +757,16 @@
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
-        getHolesTiny() {
+        getRingHolesTiny() {
             return this.inner.filter(l => l.winding == "cw").filter(l => l.isTiny);
         }
         getHoleCandidates() {
             return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny);
         }
-        getTopCandidates() {
+        getRingPeaksTiny() {
+            return this.inner.filter(l => l.winding == "ccw").filter(l => l.isTiny);
+        }
+        getRingPeaks() {
             return this.inner.filter(l => l.winding == "ccw").filter(l => !l.isTiny);
         }
         constructor(lines, minXY, maxXY) {
@@ -1396,7 +1399,7 @@
         // cw: denotes lower terrain so they are holes inside other polygons that already exist. that may be 
         //     polygons created by appending ot maybe a fulltile polygon
         // all polygons that may contain inner holes
-        const highPolys = [...concatedPolygonsArray, ...lineIndex.getTopCandidates()];
+        const highPolys = [...concatedPolygonsArray, ...lineIndex.getRingPeaks()];
         // process concated polygons and possible holes
         highPolys.forEach(concatPoly => {
             // console.log(l.line)
@@ -1429,7 +1432,7 @@
         });
         const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
         // these should be empty now
-        const remainingTops = lineIndex.getTopCandidates();
+        const remainingTops = lineIndex.getRingPeaks();
         // handle remaining holes (not conatined in any high polygon). they are contained in a fulltile polygon that will be created
         const fullTileHoles = lineIndex.getHoleCandidates();
         try {
@@ -1457,7 +1460,7 @@
             console.log({ tops: lineArrayToStrings(remainingTops), holes: lineArrayToStrings(fullTileHoles) });
             console.log("----------------- ");
         }
-        const remainingInnerRingsHigh = lineIndex.getTopCandidates();
+        const remainingInnerRingsHigh = lineIndex.getRingPeaks();
         // add remaining TOP-rings (that have not been added before)
         if (remainingInnerRingsHigh.length > 0) {
             if (dbg >= 1)
@@ -1476,41 +1479,29 @@
         // - there are tiny holes that have been ignored
         // - no polygons have been created 
         // 
-        const remainingTinyHoles = lineIndex.getHolesTiny();
+        const remainingTinyHoles = lineIndex.getRingHolesTiny();
         const noPolysCreated = newLines.length == 0;
         const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
-        if (remainingTinyHoles && noPolysCreated && tileMinLowerThanLevel) {
+        if (noPolysCreated && tileMinLowerThanLevel && remainingTinyHoles) {
             if (dbg >= 1)
                 console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && remainingTinyHoles");
-            remainingTinyHoles.forEach(h => lineIndex.removeFromSearch(h));
             const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
             newLines.push(fullTile);
         }
+        // no only tiny rings (tops, holes) should exist if at all
+        lineIndex.removeFromSearch(remainingTinyHoles);
+        // no lines should remain
         if (dbg >= 1)
             console.log("- lineIndex (should be empty): ", lineIndex.debugIndex());
         const rem = lineIndex.getRemainingAll();
         if (rem.length) {
-            console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length);
+            console.log("## WARN: remaing lines, tile: " + tileInfo.coordString(), rem.length);
             console.error(lineIndex.debugIndex());
+            console.error(tileInfo.toString());
             throw new Error("lineIndex at end not empty: " + tileInfo.coordString());
         }
-        rem.forEach(l => {
-            console.log("- add remaining line: ", l.line);
-            if (l.line)
-                newLines.push(l.line);
-        });
-        for (let line of lines) {
-            //  line = checkLine(line, minXY,maxXY)
-            //  console.log(line)
-            // newLines.push( line );
-        }
-        for (let line of lines) {
-            // if (lvl==2500) findAbnormal(line)
-            //line = checkLine(line, minXY,maxXY)
-            // console.log(line)
-            // newLines.push( line );
-        }
-        //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
+        if (dbg >= 1)
+            console.log("END -- createIsoPolys ------", lineIndex);
         return newLines;
     }
     function pointInPolygonFlat(px, py, polygon) {
