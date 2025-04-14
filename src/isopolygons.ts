@@ -560,10 +560,18 @@ const EDGES: EdgeId[] = [1, 2, 4, 8]
 
 
 export class LineIndex {
+    getRingHolesTiny() {
+        return this.inner.filter(l => l.winding == "cw").filter(l => l.isTiny);
+    }
+
     getHoleCandidates() {
         return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny)
     }
-    getTopCandidates() {
+
+    getRingPeaksTiny() {
+        return this.inner.filter(l => l.winding == "ccw").filter(l => l.isTiny);
+    }
+    getRingPeaks() {
         return this.inner.filter(l => l.winding == "ccw").filter(l => !l.isTiny);
     }
 
@@ -617,16 +625,19 @@ export class LineIndex {
         return Array.from(new Set(rem));
     }
 
-    getRemaining() {
+    getRemainingEdges() {
         return this.lineIndexFlatList(this.lineIndex)
+    }
+    getRemainingAll() {
+        return [...this.getRemainingEdges(), ...this.inner]
     }
 
     get all() {
-        return this.getRemaining();
+        return this.getRemainingAll();
     }
 
-    get remainCount() {
-        return this.getRemaining().length;
+    get remainEdgeCount() {
+        return this.getRemainingEdges().length;
     }
 
     createLineEdgeIndexFromLines(lines, minXY, maxXY) {
@@ -919,7 +930,11 @@ export class LineIndex {
     /**
      * create a closed polygon for the full tile
      */
-    static getFullTilePolygon(minXY: number, maxXY: number) {
+    static getFullTilePolygon(minXY?: number, maxXY?: number) {
+
+        if (minXY == undefined) throw new Error("minXY invalid: " + minXY)
+        if (maxXY == undefined) throw new Error("maxXY invalid: " + maxXY)
+
         const corners = LineIndex.getTileCornersCounterClockWiseCount(1, 4, minXY, maxXY);
         //Close polygon
         corners.push(corners[0])
@@ -1203,20 +1218,36 @@ export class LineIndex {
  * @returns 
  */
 export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo: TileInformation) {
+    // SET-DBG convertTileIsolinesToPolygons 
+    const dbg = Number(`${0}`);
+    // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
 
-    const lines = linesIn.filter(l => l.length > 6)
+    // filter out lines that are not valid, too small
+    const lines = linesIn.filter(l => l.length > 6);
 
     if (!lines || lines.length < 1) {
-        console.log("Tile w/o lines: " + tileInfo.coordString())
+        // no valid lines available
+
+        // handles special cases - where full tile is required
+        const tileMinAboveLevel = tileInfo.min || -Infinity > lvl
+        const invalidLines = linesIn.filter(l => l.length <= 6);
+        const onlyInvalidLines = invalidLines.length == linesIn.length
+        if (dbg >= 0) console.log(`Tile ${tileInfo.coordString()} lvl:${lvl} w/o lines, tileMin-above-level:${tileMinAboveLevel} onlyInvalidLines:${onlyInvalidLines} tile.min:${tileInfo.min}`);
+
+        // case 1) Tile min elevation is above level
+        const case1 = tileMinAboveLevel
+        // case 2) tile min elevation is not above but lower but only invalid lines available (enclosing eht lower terrain)
+        const case2 = !tileMinAboveLevel && onlyInvalidLines
+        if (case1 || case2) {
+            const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
+            return [fullTile]
+        }
+
         return [];
     }
 
     const newLines: LineArray = [];
     const concatedPolygonsArray: TiledLine[] = [];
-
-    // SET-DBG convertTileIsolinesToPolygons 
-    const dbg = Number(`${tileInfo.isTile(null, 328, 713) ? "1" : "0"}`);
-    //const dbg = Number(`${0}`);
 
     if (dbg >= 1) console.log(`convertIsoToPolys START - Tile: ${tileInfo.coordString()} `)
 
@@ -1236,7 +1267,7 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
 
     // iterate over all edge-lines in the tile.
     // not all lines will end up here because they me be appended to other lines and removed from the list
-    const totalEdgeLineCount = lineIndex.getRemaining().length;
+    const totalEdgeLineCount = lineIndex.getRemainingEdges().length;
     const firstline = lineIndex.getFirst();
     let i = -1;
     let currentEdgeLine = firstline;
@@ -1318,7 +1349,7 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
     //     polygons created by appending ot maybe a fulltile polygon
 
     // all polygons that may contain inner holes
-    const highPolys = [...concatedPolygonsArray, ...lineIndex.getTopCandidates()]
+    const highPolys = [...concatedPolygonsArray, ...lineIndex.getRingPeaks()]
 
     // process concated polygons and possible holes
     highPolys.forEach(concatPoly => {
@@ -1358,7 +1389,7 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
 
 
     // these should be empty now
-    const remainingTops = lineIndex.getTopCandidates()
+    const remainingTops = lineIndex.getRingPeaks()
 
     // handle remaining holes (not conatined in any high polygon). they are contained in a fulltile polygon that will be created
     const fullTileHoles = lineIndex.getHoleCandidates();
@@ -1373,7 +1404,7 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
 
             // these cases are not handled correctly, must be holes in other polygons
             //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
-            if (lineIndex.remainCount > 0) throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainCount: ${lineIndex.remainCount}`)
+            if (lineIndex.remainEdgeCount > 0) throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainEdgeCount: ${lineIndex.remainEdgeCount}`)
 
             // add as holes to full tile poly
             if (dbg >= 1) console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `, { fullTileCCW })
@@ -1391,7 +1422,7 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
     }
 
 
-    const remainingInnerRingsHigh = lineIndex.getTopCandidates();
+    const remainingInnerRingsHigh = lineIndex.getRingPeaks();
     // add remaining TOP-rings (that have not been added before)
     if (remainingInnerRingsHigh.length > 0) {
         if (dbg >= 1)
@@ -1404,34 +1435,46 @@ export function convertTileIsolinesToPolygons(lvl, linesIn: LineArray, tileInfo:
         //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
     }
 
-    // lineIndex should be completely Empty
+    // remove tiny peaks (ignored)
+    lineIndex.removeFromSearch(lineIndex.getRingPeaksTiny())
 
 
-    const rem = lineIndex.getRemaining();
+    // handles very special case for fullTile
+    // 
+    // conditions:
+    // - tile min elevation is lower than this level (regular full tile condition not met)
+    // - there are tiny holes that have been ignored
+    // - no polygons have been created 
+    // 
+    const remainingTinyHoles = lineIndex.getRingHolesTiny();
+
+    const noPolysCreated = newLines.length == 0;
+    const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
+    if (noPolysCreated && tileMinLowerThanLevel && remainingTinyHoles) {
+        if (dbg >= 1)
+            console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && remainingTinyHoles");
+        const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
+        newLines.push(fullTile);
+    }
+
+    // no only tiny rings (tops, holes) should exist if at all
+    lineIndex.removeFromSearch(remainingTinyHoles)
+
+    // no lines should remain
+    if (dbg >= 1)
+        console.log("- lineIndex (should be empty): ", lineIndex.debugIndex());
+
+    const rem = lineIndex.getRemainingAll();
     if (rem.length) {
-        console.log("## WARN: remaing lines (are added) tile: " + tileInfo.coordString(), rem.length)
+        console.log("## WARN: remaing lines, tile: " + tileInfo.coordString(), rem.length)
         console.error(lineIndex.debugIndex())
+        console.error(tileInfo.toString())
         throw new Error("lineIndex at end not empty: " + tileInfo.coordString());
     }
-    rem.forEach(l => {
-        console.log("- add remaining line: ", l.line)
-        if (l.line) newLines.push(l.line)
-    })
+    
 
-    for (let line of lines) {
-        //  line = checkLine(line, minXY,maxXY)
-        //  console.log(line)
-        // newLines.push( line );
-    }
-
-    for (let line of lines) {
-        // if (lvl==2500) findAbnormal(line)
-
-        //line = checkLine(line, minXY,maxXY)
-        // console.log(line)
-        // newLines.push( line );
-    }
-    //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
+    
+    if (dbg >= 1) console.log("END -- createIsoPolys ------", lineIndex)
     return newLines;
 }
 

@@ -197,8 +197,8 @@ export default function generateIsolines(
   const fragmentByEndByLevel: Map<number, Map<number, Fragment>> = new Map();
 
 
-  //ISOPOLYS: need this to identify edges
-
+  //set-DBG 
+  // const dbg = Number(`${( x==11, y==21) ? "1" : "0"}`);
   const dbg: string = `${0}`;
 
   const minXY = multiplier * (0 - 1);
