@@ -1482,11 +1482,14 @@
         // - no polygons have been created 
         // 
         const remainingTinyHoles = lineIndex.getRingHolesTiny();
+        const hasRemainingTinyHoles = remainingTinyHoles.length;
         const noPolysCreated = newLines.length == 0;
         const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
-        if (noPolysCreated && tileMinLowerThanLevel && remainingTinyHoles) {
-            if (dbg >= 1)
-                console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && remainingTinyHoles");
+        if (noPolysCreated && tileMinLowerThanLevel && hasRemainingTinyHoles) {
+            if (dbg >= 1) {
+                console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && hasRemainingTinyHoles");
+                console.log({ remainingTinyHoles, tileInfo, hasRemainingTinyHoles });
+            }
             const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
             newLines.push(fullTile);
         }
