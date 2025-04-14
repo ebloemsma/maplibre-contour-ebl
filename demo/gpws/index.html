@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Display a map</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <script src="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.js"></script>
+  <!--<script src="../_dist/index.js"></script>-->
+  <script src="./gpws.js"></script>
+  <script src="../../dist/index.js"></script>
+
+  <link href="https://unpkg.com/maplibre-gl@4.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+  <style>
+    .map-overlay {
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      position: absolute;
+      width: 200px;
+      top: 0;
+      left: 0;
+      padding: 10px;
+    }
+
+    .map-overlay .map-overlay-inner {
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .map-overlay-inner fieldset {
+      border: none;
+      padding: 0;
+      margin: 0 0 10px;
+    }
+
+    .map-overlay-inner fieldset:last-child {
+      margin: 0;
+    }
+
+    .map-overlay-inner select {
+      width: 100%;
+    }
+
+    .map-overlay-inner label {
+      display: block;
+      font-weight: bold;
+      margin: 0 0 5px;
+    }
+
+    .map-overlay-inner button {
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .map-overlay-inner button:focus {
+      outline: none;
+    }
+
+    .map-overlay-inner button:hover {
+      box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map" style="background-color: black;"></div>
+  <div class="map-overlay top">
+    <div class="map-overlay-inner">
+      <fieldset>
+        <label for="layer">Current Altitude: [<span id="setAlt"></span>]</label>
+        <select id="layer" name="layer" _onChange="selectLayer(e)">
+          <option value="17000">17000</option>
+          <option value="15000">15000</option>
+          <option value="13000">13000</option>
+          <option value="11000">11000</option>
+          <option value="8000">8000</option>
+          <option value="6000">6000</option>
+          <option value="4000">4000</option>
+          <option value="3000">3000</option>
+          <option value="2500" selected>2500</option>
+          <option value="2000">2000</option>
+          <option value="1000">1000</option>
+          <option value="500">500</option>
+          <option value="200">200</option>
+          <option value="0">0</option>
+        </select>
+      </fieldset>
+
+      <div class="slidecontainer">
+        <input type="range" min="0" max="6000" value="50" class="slider" id="altSlider" style="width: 300px">
+      </div>
+
+    </div>
+  </div>
+  <script>
+
+    const demTileServerBaseUrl = TILESERVER_AWS 
+    // const demTileServerBaseUrl = getLocalTileServerUrl("seattle-z10-mz");
+
+    const demSource = new mlcontour.DemSource({
+      url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
+      //url: "http://localhost:8080/services/seattle-mz/tiles/{z}/{x}/{y}.png", 
+      encoding: "terrarium",
+      maxzoom: 12,
+      minzoom: 5,
+
+      
+    });
+
+
+
+    // calls maplibregl.addProtocol for the shared cache and contour protocols
+    demSource.setupMaplibre(maplibregl);
+
+    let SelectedGPWSAltitude = 1606;
+    demSource.GetOptions = (tileCoords) => {
+
+      const gpwsLevels = createGpwsLevel(SelectedGPWSAltitude);
+      console.log("createGpwsLevel", gpwsLevels)
+
+      const config = {
+        contours: gpwsLevels,
+        //intervals : [100], //levels[0]
+        polygons: true,
+        deltaReference: SelectedGPWSAltitude, //400,
+      }
+
+      return config;
+    }
+
+    var map = new maplibregl.Map({
+      container: "map",
+      zoom: 12.55,
+      center: [-122, 47.92731],
+      hash: true,
+      style: {
+        showTileBoundaries: true,
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        sources: {
+          // dem: {
+          //   type: "raster-dem",
+          //   encoding: "terrarium",
+          //   tiles: [demSource.sharedDemProtocolUrl], // share cached DEM tiles with contour layer
+          //   maxzoom: 15,
+          //   tileSize: 256,
+          // },
+          contourSourceFeet: {
+            type: 'vector',
+            tiles: [
+              demSource.contourProtocolUrl({
+                // meters to feet
+                multiplier: 3.28084,
+                overzoom: 1,
+                maxFetchZoom: 10,
+                thresholds: {
+                  // zoom: [minor, major]
+                  // 3: [100, 100],
+                  // 13: [100, 100]
+                },
+                elevationKey: 'ele',
+                intervalKey: 'level',
+                contourLayer: 'contours',
+
+              })
+            ],
+            maxzoom: 13,
+            minzoom: 4
+          }
+        },
+
+        layers: [
+          // {
+          //   id: "hills",
+          //   type: "hillshade",
+          //   source: "dem",
+          //   paint: {
+          //     "hillshade-exaggeration": 0.25,
+          //   },
+          //   layout: {
+          //     visibility: "none",
+          //   }
+          // },
+          {
+            id: "contours",
+            type: "line",
+            source: "contourSourceFeet",
+            "source-layer": "contours",
+            paint: {
+              "line-color": "rgba(0,0,0, 50%)",
+              "line-width": ["match", ["get", "level"], 1, 1, 0.5],
+            },
+            layout: {
+              "line-join": "round",
+            },
+          },
+
+          {
+            id: 'gpwsPattern',
+            type: 'fill',
+            source: 'contourSourceFeet',
+            'source-layer': 'contours',
+            //filter: ['<', ['get', 'elev'], 3400],
+            paint: {
+              'fill-pattern': ['get', 'gpwsPattern'],
+
+              //'fill-pattern': ['match', ['get', 'delta'], +2000, "red_high", +1000, "amber_high",  -500, "amber_low", -1000, "green_high", -2000, "green_low", ""],
+              'fill-opacity': 1,
+              // 'fill-pattern': 'amber_low'
+            },
+            layout: {
+              // visibility: "none",
+            }
+          },
+
+          {
+            id: 'gpwsColors',
+            type: 'fill',
+            source: 'contourSourceFeet',
+            'source-layer': 'contours',
+            paint: {
+              'fill-color': ['match', ['get', 'delta'], +2000, "#f00", +1000, "#f5b642", -500, "#f5e342", -1000, "#09ff00", -2000, "#99fa96", "#000"],
+              //'fill-color': ['match', ['get', 'delta'], -500, "#f5e342", "#0f0"],
+
+              //'fill-color': ['match', ['get', 'ele'], 0, "#00f", "#0f0"],
+              'fill-opacity': 1,
+            }
+            , layout: {
+              visibility: "none",
+            }
+          },
+
+          {
+            id: 'contour-text',
+            type: 'symbol',
+            source: 'contourSourceFeet',
+            'source-layer': 'contours',
+            //filter: ['>', ['get', 'level'], 0],
+            paint: {
+              'text-halo-color': 'white',
+              'text-halo-width': 1
+            },
+            layout: {
+              visibility: "none",
+              'symbol-placement': 'line',
+              'text-size': 10,
+              'text-field': [
+                'concat',
+                //['number-format', ['get', 'ele'], {}],
+                ['number-format', ['get', 'delta'], {}],
+                '\'', ' / ',
+                ['number-format', ['get', 'ele'], {}]
+              ],
+              'text-font': ['Noto Sans Bold']
+            }
+          }
+        ],
+        // terrain: {
+        //   source: 'dem',
+        //   exaggeration: 1
+        // },
+      },
+    });
+
+
+
+    map.on('load', async () => {
+      async function addPatern(name) {
+        const url = `./gpws_${name}.png`;
+        const image = await map.loadImage(url);
+        map.addImage(name, image.data);
+      }
+
+
+
+      addPatern("green_low");
+      addPatern("green_high");
+      addPatern("amber_low");
+      addPatern("amber_high");
+      addPatern("red_high");
+
+
+    })
+
+    const selectGPWS = document.getElementById('layer');
+
+    const setAltElement = document.getElementById('setAlt');
+
+    selectGPWS.addEventListener("change", function ($e) {
+      setGPWS(Number($e.target.value))
+    })
+
+    function setGPWS( alt ){
+      SelectedGPWSAltitude = alt
+      console.log("select GPWS Alt:", SelectedGPWSAltitude)
+      setAltElement.innerHTML = alt
+      //force map-update
+      map.style.sourceCaches['contourSourceFeet'].clearTiles()
+      map.style.sourceCaches['contourSourceFeet'].update(map.transform)
+    };
+
+    // map.on('load', async () => {
+    //     const image = await map.loadImage('pattern.png');
+    //     // Declare the image
+    //     map.addImage('pattern', image.data);
+    // })
+    map.on("click", e => {
+      console.log(e.lngLat)
+
+      //const elev=map.queryTerrainElevation([e.lngLat.lng,e.lngLat.lat])
+      //console.log(elev)
+
+      const meter2Feet = 3.28084;
+      const elevationMeters = null;//map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert([e.lngLat.lng, e.lngLat.lat]), map.transform.tileZoom)
+      const elevationFeet = elevationMeters * meter2Feet
+
+      const zoom = map.getZoom()
+
+      console.log({ zoom, elevationFeet })
+    })
+    map.showTileBoundaries = true;
+
+    var rangeInput = document.getElementById("altSlider");
+    
+    if (rangeInput.addEventListener) {
+      rangeInput.addEventListener('change', altRange);
+    }
+
+    function altRange($e) {
+      var value = Number($e.target.value)
+      
+      setGPWS(value)
+    }
+
+  </script>
+</body>
+
+</html>
