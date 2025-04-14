@@ -11,7 +11,7 @@ const demSource = new mlcontour.DemSource({
   url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
   //url: "http://localhost:8080/services/seattle-mz/tiles/{z}/{x}/{y}.png", 
   encoding: "terrarium",
-  maxzoom: 12,
+  maxzoom: 14,
   minzoom: 5,
   worker: true, // offload isoline computation to a web worker to reduce jank
   cacheSize: 100, // number of most-recent tiles to cache
@@ -45,8 +45,8 @@ const myCountour = {
           multiplier: 3.28084,
           overzoom: 1,
           //maxFetchZoom: 10,
-          thresholds: defaultThresholdCfg,
-          
+          thresholds: [],//defaultThresholdCfg,
+
           elevationKey: 'ele',
           intervalKey: 'level',
           contourLayer: 'contours',
@@ -54,8 +54,8 @@ const myCountour = {
           buffer: 1,
         })
       ],
-      maxzoom: 13,
-      minzoom: 4
+      // maxzoom: 15,
+      // minzoom: 4
     }
   },
   layers: [
@@ -68,6 +68,9 @@ const myCountour = {
       },
       layout: {
         visibility: "visible",
+      },
+      metadata: {
+        usercontrol: true,
       }
     },
     {
@@ -82,6 +85,27 @@ const myCountour = {
       layout: {
         "line-join": "round",
       },
+      metadata: {
+        usercontrol: true,
+      }
+    },
+    {
+      id: 'polygons',
+      type: 'fill',
+      source: 'contourSourceFeet',
+      'source-layer': 'contours',
+      paint: {
+        'fill-color': "#f00",
+        // 'fill-color': ['match', ['get', 'delta'], -500, "#f5e342", "#0f0"],
+        // 'fill-color': ['match', ['get', 'ele'], 0, "#00f", "#0f0"],
+        'fill-opacity': 0.3,
+      },
+      layout: {
+        visibility: "none",
+      },
+      metadata: {
+        usercontrol: true,
+      }
     },
     {
       id: "contour-labels",
@@ -90,15 +114,19 @@ const myCountour = {
       "source-layer": "contours",
       //filter: [">", ["get", "level"], 0],
       layout: {
+        "visibility": "none",
         "symbol-placement": "line",
         "text-size": 10,
         "text-field": ["concat", ["number-format", ["get", "ele"], {}], "'"],
-        "text-font": ["Noto Sans Bold"],
+        //"text-font": ["Noto Sans Bold"],
       },
       paint: {
         "text-halo-color": "white",
         "text-halo-width": 1,
       },
+      metadata: {
+        usercontrol: true,
+      }
     }
   ]
 }
