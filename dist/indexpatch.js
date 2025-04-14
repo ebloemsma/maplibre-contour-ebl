@@ -1290,7 +1290,7 @@
      */
     function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
         // SET-DBG convertTileIsolinesToPolygons 
-        const dbg = Number(`${0}`);
+        const dbg = Number(`${1}`);
         // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
         // filter out lines that are not valid, too small
         const lines = linesIn.filter(l => l.length > 6);
@@ -1430,36 +1430,7 @@
             // const removed = arrayRemoveObjects(holeCandidates, ...foundHoles)
             // if (dbg >= 2) console.log("removed hole candidates:" + removed )
         });
-        const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
-        // these should be empty now
-        const remainingTops = lineIndex.getRingPeaks();
-        // handle remaining holes (not conatined in any high polygon). they are contained in a fulltile polygon that will be created
-        const fullTileHoles = lineIndex.getHoleCandidates();
-        try {
-            if (fullTileHoles.length > 0) {
-                // holes inside other polygons on this level
-                if (dbg >= 1)
-                    console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles));
-                // check preconditions
-                if (remainingTops.length > 0)
-                    throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled tops(${remainingTops.length}), not handled `);
-                // these cases are not handled correctly, must be holes in other polygons
-                //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
-                if (lineIndex.remainEdgeCount > 0)
-                    throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainEdgeCount: ${lineIndex.remainEdgeCount}`);
-                // add as holes to full tile poly
-                if (dbg >= 1)
-                    console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `, { fullTileCCW });
-                newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line));
-                lineIndex.removeFromSearch(fullTileHoles);
-            }
-        }
-        catch (e) {
-            console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString());
-            console.log(e);
-            console.log({ tops: lineArrayToStrings(remainingTops), holes: lineArrayToStrings(fullTileHoles) });
-            console.log("----------------- ");
-        }
+
         const remainingInnerRingsHigh = lineIndex.getRingPeaks();
         // add remaining TOP-rings (that have not been added before)
         if (remainingInnerRingsHigh.length > 0) {
@@ -1474,27 +1445,93 @@
         }
         // remove tiny peaks (ignored)
         lineIndex.removeFromSearch(lineIndex.getRingPeaksTiny());
-        // handles very special case for fullTile
-        // 
-        // conditions:
-        // - tile min elevation is lower than this level (regular full tile condition not met)
-        // - there are tiny holes that have been ignored
-        // - no polygons have been created 
-        // 
+
+        /****
+         *  handles very special case for fullTile
+         * 
+         */
+        let fullTileAdded = false;
+
+        const fullTileHoles = lineIndex.getHoleCandidates();
+        const fullTilePeaks = lineIndex.getRingPeaks();
         const remainingTinyHoles = lineIndex.getRingHolesTiny();
+
         const hasRemainingTinyHoles = remainingTinyHoles.length;
         const noPolysCreated = newLines.length == 0;
         const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
-        if (noPolysCreated && tileMinLowerThanLevel && hasRemainingTinyHoles) {
+
+        if (dbg >= 1) {
+            console.log("fullTile special handling:");
+            console.log({ fullTilePeaks,fullTileHoles, remainingTinyHoles, tileInfo, noPolysCreated,tileMinLowerThanLevel, });
+            console.log("- lineIndex: ", lineIndex.debugIndex());
+        }
+
+        // 
+        // case1:
+        // - tile min elevation is lower than this level (regular full tile condition not met)
+        // - there are tiny holes that have been ignored
+        // - no polygons have been created 
+        // - no uncontained peaks
+        const case1 = noPolysCreated && tileMinLowerThanLevel && hasRemainingTinyHoles
+        if (case1) {
             if (dbg >= 1) {
-                console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && hasRemainingTinyHoles");
-                console.log({ remainingTinyHoles, tileInfo, hasRemainingTinyHoles });
+                console.log("fullTile-special case1: tileMinLowerThanLevel && noPolysCreated && hasRemainingTinyHoles");
             }
             const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
             newLines.push(fullTile);
+            fullTileAdded=true;
         }
-        // no only tiny rings (tops, holes) should exist if at all
         lineIndex.removeFromSearch(remainingTinyHoles);
+
+        
+        
+        //
+        // case 2:  remaining holes (not contained in any high polygon). 
+        // they are contained in a fulltile polygon that will be created
+        
+        try {
+            if (fullTileHoles.length > 0) {
+
+                // holes inside other polygons on this level
+                if (dbg >= 1)
+                    console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles));
+
+                if(fullTileAdded) throw new Error("full tile was already added");
+                if(newLines.length) throw new Error("created polygons exist, no fulltile possible");
+                
+                // check preconditions
+                if (fullTilePeaks.length > 0)
+                    throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled tops(${fullTilePeaks.length}), not handled `);
+                // these cases are not handled correctly, must be holes in other polygons
+                //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
+                if (lineIndex.remainEdgeCount > 0)
+                    throw new Error(`uncontained holes(${fullTileHoles.length}) + remainEdgeCount: ${lineIndex.remainEdgeCount}`);
+                // add as holes to full tile poly
+                if (dbg >= 1)
+                    console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `, { fullTileCCW });
+                const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32]; 
+                newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line));
+                lineIndex.removeFromSearch(fullTileHoles);
+            }
+        }
+        catch (e) {
+            console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString());
+            console.log(e);
+            console.log({ tops: lineArrayToStrings(fullTilePeaks), holes: lineArrayToStrings(fullTileHoles) });
+            console.log("----------------- ");
+        }
+        
+        //sometimes holes remain that are not handled before
+        const uncontainedWarnHoles = lineIndex.getHoleCandidates();
+        if( uncontainedWarnHoles.length ){
+            console.error("ignore uncontained holes: " + uncontainedWarnHoles.length, lineArrayToStrings(uncontainedWarnHoles),tileInfo.toString())
+        
+            lineIndex.removeFromSearch(uncontainedWarnHoles)
+        }
+
+        
+        // no only tiny rings (tops, holes) should exist if at all
+        
         // no lines should remain
         if (dbg >= 1)
             console.log("- lineIndex (should be empty): ", lineIndex.debugIndex());
@@ -1706,7 +1743,7 @@
         const fragmentByEndByLevel = new Map();
         //set-DBG 
         // const dbg = Number(`${( x==11, y==21) ? "1" : "0"}`);
-        const dbg = `${0}`;
+        const dbg = `${1}`;
         const minXY = multiplier * (0 - 1);
         const maxXY = 4096 + Math.abs(minXY);
         const fullTile = new TileInformation(z, x, y, tile);
