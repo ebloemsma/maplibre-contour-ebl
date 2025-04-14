@@ -365,6 +365,7 @@
             const { edgeMin, edgeMax } = findTileEdgeMinMax(tile);
             this.edgeMin = Math.round(edgeMin);
             this.edgeMax = Math.round(edgeMax);
+            this.tile = tile;
         }
         constructor(z, x, y, tile) {
             this.z = z;
@@ -1289,6 +1290,7 @@
      * @returns
      */
     function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
+        var _a;
         // SET-DBG convertTileIsolinesToPolygons 
         const dbg = Number(`${0}`);
         // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
@@ -1297,15 +1299,17 @@
         if (!lines || lines.length < 1) {
             // no valid lines available
             // handles special cases - where full tile is required
-            const tileMinAboveLevel = tileInfo.min || -Infinity > lvl;
-            const invalidLines = linesIn.filter(l => l.length <= 6);
+            const tileMinAboveLevel = ((_a = tileInfo.min) !== null && _a !== undefined ? _a : -Infinity) > lvl;
+            const invalidLines = linesIn.filter(l => l.length <= 4);
             const onlyInvalidLines = invalidLines.length == linesIn.length;
-            if (dbg >= 0)
-                console.log(`Tile ${tileInfo.coordString()} lvl:${lvl} w/o lines, tileMin-above-level:${tileMinAboveLevel} onlyInvalidLines:${onlyInvalidLines} tile.min:${tileInfo.min}`);
             // case 1) Tile min elevation is above level
             const case1 = tileMinAboveLevel;
             // case 2) tile min elevation is not above but lower but only invalid lines available (enclosing eht lower terrain)
             const case2 = !tileMinAboveLevel && onlyInvalidLines;
+            if (dbg >= 1) {
+                console.log(`Tile ${tileInfo.coordString()} lvl:${lvl} w/o lines, tileMinAboveLevel:${tileMinAboveLevel} onlyInvalidLines:${onlyInvalidLines} tile.min:${tileInfo.min} case1:${case1} case2:${case2}`);
+                console.log(linesIn);
+            }
             if (case1 || case2) {
                 const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
                 return [fullTile];
