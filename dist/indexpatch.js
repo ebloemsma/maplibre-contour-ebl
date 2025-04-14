@@ -1472,6 +1472,8 @@
             });
             //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
         }
+        // remove tiny peaks (ignored)
+        lineIndex.removeFromSearch(lineIndex.getRingPeaksTiny());
         // handles very special case for fullTile
         // 
         // conditions:
