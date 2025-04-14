@@ -765,6 +765,10 @@
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
     class LineIndex {
+        getHolesTiny() {
+            return this.inner.filter(l => l.winding == "cw").filter(l => l.isTiny);
+        }
+
         getHoleCandidates() {
             return this.inner.filter(l => l.winding == "cw").filter(l => !l.isTiny);
         }
@@ -1284,16 +1288,30 @@
      * @returns
      */
     function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
+        // SET-DBG convertTileIsolinesToPolygons 
+        const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
+        //const dbg = Number(`${0}`);
+
         const lines = linesIn.filter(l => l.length > 6);
+        
         if (!lines || lines.length < 1) {
-            console.log("Tile w/o lines: " + tileInfo.coordString());
+            const tileMinAboveLevel = tileInfo.min > lvl
+            
+            const invalidLines = linesIn.filter(l => l.length <= 6);
+            const onlyInvalidLines = invalidLines.length==linesIn.length
+            console.log(`Tile ${tileInfo.coordString()} lvl:${lvl} w/o lines,  tileMin above level:${tileMinAboveLevel}`, {tileInfo, onlyInvalidLines});
+
+            if ( tileMinAboveLevel || (!tileMinAboveLevel && onlyInvalidLines) ) {
+                const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
+                return [fullTile]
+            }
+            
             return [];
         }
+
         const newLines = [];
         const concatedPolygonsArray = [];
-        // SET-DBG convertTileIsolinesToPolygons 
-        const dbg = Number(`${tileInfo.isTile(null, 328, 713) ? "1" : "0"}`);
-        //const dbg = Number(`${0}`);
+        
         if (dbg >= 1)
             console.log(`convertIsoToPolys START - Tile: ${tileInfo.coordString()} `);
         const minXY = tileInfo.minXY;
@@ -1372,7 +1390,7 @@
         if (dbg >= 1)
             console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
         if (dbg >= 1)
-            console.log("- lineIndex (should have noe egde lines): ", lineIndex.debugIndex());
+            console.log("- lineIndex (should have no egde lines): ", lineIndex.debugIndex());
         // handle inner self-closed lines (rings/polygons) that never touched edges
         // depending on winding they denote higher or lower terrain
         // ccw: denotes higher terrain - can just be added as polygons
@@ -1441,7 +1459,8 @@
             console.log("----------------- ");
         }
         const remainingInnerRingsHigh = lineIndex.getTopCandidates();
-        // add remaining TOP-rings (that have not been added before)
+
+        // add remaining TOP-rings (that have not been added before) and that do not have holes
         if (remainingInnerRingsHigh.length > 0) {
             if (dbg >= 1)
                 console.log("remainingInnerRingsHigh: ", lineArrayToStrings(remainingInnerRingsHigh));
@@ -1452,6 +1471,31 @@
             });
             //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
         }
+
+
+        // very special case: 
+        // - there are tiny holes that have been ignored
+        // - no polygons have been created 
+        // - tile min elevation is lowe than this level
+        // => create a full tile layer
+        const remainingTinyHoles = lineIndex.getHolesTiny()
+        const nowPolygons = newLines.length == 0
+        const tileMinLowerThanLevel = tileInfo.min < lvl
+       
+        if( remainingTinyHoles && nowPolygons && tileMinLowerThanLevel ) {    
+            if (dbg>=1) console.log("nowPolygons && remainingTinyHoles && tileMinLowerThanLevel : ",{
+                remainingTinyHoles,nowPolygons,tileMinLowerThanLevel
+            })
+
+            remainingTinyHoles.forEach( h => lineIndex.removeFromSearch(h))
+            
+            const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
+            newLines.push(fullTile)
+
+        }
+        if (dbg >= 1)
+            console.log("- lineIndex (should have empty): ", lineIndex.debugIndex());
+
         // lineIndex should be completely Empty
         const rem = lineIndex.getRemaining();
         if (rem.length) {
@@ -1459,23 +1503,10 @@
             console.error(lineIndex.debugIndex());
             throw new Error("lineIndex at end not empty: " + tileInfo.coordString());
         }
-        rem.forEach(l => {
-            console.log("- add remaining line: ", l.line);
-            if (l.line)
-                newLines.push(l.line);
-        });
-        for (let line of lines) {
-            //  line = checkLine(line, minXY,maxXY)
-            //  console.log(line)
-            // newLines.push( line );
-        }
-        for (let line of lines) {
-            // if (lvl==2500) findAbnormal(line)
-            //line = checkLine(line, minXY,maxXY)
-            // console.log(line)
-            // newLines.push( line );
-        }
-        //if (dbg >= 1) console.log("createIso = END ==============", lineIndex)
+
+
+        
+        if (dbg >= 1) console.log("convertTileIsolinesToPolygons  END ==============", lineIndex)
         return newLines;
     }
     function pointInPolygonFlat(px, py, polygon) {
@@ -1674,14 +1705,16 @@
         const fragmentByStartByLevel = new Map();
         const fragmentByEndByLevel = new Map();
         //ISOPOLYS: need this to identify edges
-        const dbg = `${0}`;
+        const dbg = Number(`${( x==11, y==21) ? "1" : "0"}`);
+        // const dbg = `${1}`;
         const minXY = multiplier * (0 - 1);
         const maxXY = 4096 + Math.abs(minXY);
         const fullTile = new TileInformation(z, x, y, tile);
         fullTile.minXY = minXY;
         fullTile.maxXY = maxXY;
         if (dbg == "1")
-            console.log(`genIsolines: ${z}/${y}/${x} `);
+            console.log(`generateIsolines: ${z}/${x}/${y} `);
+
         function interpolate(point, threshold, accept) {
             if (point[0] === 0) {
                 // left
@@ -1867,6 +1900,8 @@
                 else {
                     throw new Error("no levels, contours set");
                 }
+
+
                 const fullTilePolys = generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z);
                 if (Object.keys(fullTilePolys).length) {
                     // console.log("fullTilePolys",fullTilePolys );
