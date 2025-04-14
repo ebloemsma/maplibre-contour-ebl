@@ -54,9 +54,9 @@ const layerVisibleSingle = ref([])
 const layerVisibleGroup = reactive({})
 
 
-const demOptionsAltitude = ref(2320);
+const demOptionsAltitude = ref(1289);
 const demOptionsPolygons = ref(true)
-const demOptionsMode = ref("gpws")
+const demOptionsMode = ref("line")
 
 
 
@@ -106,7 +106,7 @@ onMounted(() => {
         let visGroup = {}
         groups.filter(g=>g!=="").forEach( groupname=> {
             const glayers = userControlLayers.value[groupname]
-            visGroup[groupname] = glayers.find( l => l.layout.visibility === "visible" ).id
+            // visGroup[groupname] = glayers.find( l => l.layout.visibility === "visible" ).id
             // console.log(glayers) 
         })
         Object.assign(layerVisibleGroup,visGroup)

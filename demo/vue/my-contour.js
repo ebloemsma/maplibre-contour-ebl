@@ -5,7 +5,8 @@ function getLocalTileServerUrl(setname, port) {
   return `http://localhost:${port || 3900}/services/${setname}/tiles/`
 }
 
-const demTileServerBaseUrl = getLocalTileServerUrl("seattle-mz") // TILESERVER_AWS
+const demTileServerBaseUrl = TILESERVER_AWS
+// const demTileServerBaseUrl = getLocalTileServerUrl("seattle-mz") // TILESERVER_AWS
 
 const demSource = new mlcontour.DemSource({
   url: demTileServerBaseUrl + "/{z}/{x}/{y}.png",
@@ -101,7 +102,7 @@ const myCountour = {
         'fill-opacity': 0.3,
       },
       layout: {
-        visibility: "none",
+        visibility: "visible",
       },
       metadata: {
         usercontrol: true,

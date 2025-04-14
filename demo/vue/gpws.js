@@ -94,7 +94,7 @@ const gpwsMapOptions = {
                 'fill-opacity': 0.3,
             }, 
             layout: {
-                visibility: "visible",
+                visibility: "none",
             },
             metadata: {
                 usercontrol: {
