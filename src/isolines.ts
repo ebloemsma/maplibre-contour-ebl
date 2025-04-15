@@ -190,6 +190,7 @@ export default function generateIsolines(
   //   return {};
   // }
   const multiplier = extent / (tile.width - 1);
+  
   let tld: number, trd: number, bld: number, brd: number;
   let r: number, c: number;
   const segments: { [ele: string]: number[][] } = {};
@@ -207,7 +208,7 @@ export default function generateIsolines(
   fullTile.minXY = minXY;
   fullTile.maxXY = maxXY;
 
-  if (dbg == "1") console.log(`genIsolines: ${z}/${y}/${x} `)
+  if (dbg == "1") console.log(`genIsolines: ${z}/${x}/${y} `)
 
 
   function interpolate(
