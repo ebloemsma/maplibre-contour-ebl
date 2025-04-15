@@ -360,6 +360,40 @@
         throw new Error('Expected [x, y] or {x, y} point format');
     };
 
+    /**
+    * Checks how many rectangle corners are passed by a line.
+    * @param {number[]} line - Line defined as [x1, y1, x2, y2, ...]
+    * @param {Object} rect - Rectangle defined by {minX, minY, maxX, maxY}
+    * @returns {number} - Number of rectangle corners touched by the line
+    */
+    function countCornersPassed(line) {
+        const rect = { minX: -32, minY: -32, maxX: 4128, maxY: 4128 };
+        const corners = [
+            [rect.minX, rect.minY],
+            [rect.minX, rect.maxY],
+            [rect.maxX, rect.minY],
+            [rect.maxX, rect.maxY]
+        ];
+        // Helper to check if point lies exactly on the line segment
+        function pointOnSegment(px, py, x1, y1, x2, y2) {
+            const cross = (px - x1) * (y2 - y1) - (py - y1) * (x2 - x1);
+            if (Math.abs(cross) > 1e-10)
+                return false;
+            const dot = (px - x1) * (px - x2) + (py - y1) * (py - y2);
+            return dot <= 0;
+        }
+        let count = 0;
+        for (const [cx, cy] of corners) {
+            for (let i = 0; i < line.length - 2; i += 2) {
+                if (pointOnSegment(cx, cy, line[i], line[i + 1], line[i + 2], line[i + 3])) {
+                    count++;
+                    break; // Don't count the same corner more than once
+                }
+            }
+        }
+        return count;
+    }
+
     class TileInformation {
         setTile(tile) {
             const { edgeMin, edgeMax } = findTileEdgeMinMax(tile);
@@ -612,8 +646,10 @@
         const signedArea = area / 2;
         const absoluteArea = Math.abs(signedArea);
         const winding = signedArea < 0 ? 'ccw' : 'cw';
+        const areaFactor = absoluteArea / (4128 * 4128);
         return {
             //isTiny,
+            areaFactor,
             signedArea,
             area: absoluteArea,
             length: perimeter,
@@ -673,6 +709,7 @@
             // cw : inner lower
             // ccw: inner is higher
             this.bbox = getLineBBox(l);
+            this.info = {};
             if (this.isClosed) {
                 const polyInfo = analyzePolygon(this.line);
                 this.info = polyInfo;
@@ -681,6 +718,7 @@
                 this.winding = polyInfo.winding;
                 this.area = polyInfo.area;
             }
+            this.info.corners = countCornersPassed(l);
         }
         clone() {
             const line = new TiledLine(this.line, this.minXY, this.maxXY);
@@ -1250,24 +1288,24 @@
             return line;
         }
         createConcatedLine(lineIn, buffer, minXY, maxXY) {
-            const dbg = `${0}`;
+            const dbg = Number(`${0}`);
             const bufferRev = [...buffer].reverse();
             const line = lineIn.clone();
-            if (dbg == "1")
-                console.log("appendLinesToClone", bufferRev);
+            if (dbg >= 0)
+                console.log("createConcatedLine()", lineIn, bufferRev);
             for (const buffLine of bufferRev) {
                 // buffLine is appended 
                 // buffline start will always be before
                 //const lineEndEdge = line.brd.end
                 //const corners = this.getTileCornersCounterClockWise(lineEndEdge, buffLine.brd.start, minXY, maxXY)
                 const corners = this.getTileCornersCounterClockWiseBetweenLines(line, buffLine, minXY, maxXY);
-                if (dbg == "1") {
-                    console.log("appendLinesToClone - add corners: ", corners);
+                if (dbg >= 0) {
+                    console.log("createConcatedLine - add corners: ", corners);
                 }
                 // insert corners if req
                 line.appendCornersAtEnd(corners, minXY, maxXY);
-                if (dbg == "1")
-                    console.log("appendLinesToClone - add line: ", buffLine);
+                if (dbg >= 0)
+                    console.log("createConcatedLine - add line: ", buffLine);
                 line.appendLine(buffLine, minXY, maxXY);
             }
             this.closeLine(line, minXY, maxXY);
@@ -1353,7 +1391,7 @@
                 break;
             }
             if (dbg >= 2)
-                console.log(`close Line (${i}) START`, currentEdgeLine);
+                console.log(`close Line (${i}) START`, currentEdgeLine.toString());
             let linesToAppend = [];
             let currentAppendCandidateLine = currentEdgeLine;
             // look for all other edge-lines in clockwise direction if they may be concat to currentLines
@@ -1376,7 +1414,7 @@
                     }
                     if (nextAppendCandidate) {
                         if (dbg >= 2)
-                            console.log(`close line(${i} - append line:`, nextAppendCandidate);
+                            console.log(`close line(${i} - append line:`, nextAppendCandidate.toString());
                         linesToAppend.push(nextAppendCandidate);
                     }
                     currentAppendCandidateLine = nextAppendCandidate;
@@ -1387,6 +1425,10 @@
                 }
             }
             const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
+            // if( concatedLine.info.areaFactor > 1 ){
+            //     console.error("concat line area max: ", concatedLine,currentEdgeLine)
+            //     return [concatedLine.line]
+            // } 
             concatedPolygonsArray.push(concatedLine);
             //lineIndex.addToFinal(concatedLine)
             lineIndex.removeFromSearch(currentEdgeLine);
@@ -1396,7 +1438,7 @@
         if (dbg >= 1)
             console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
         if (dbg >= 1)
-            console.log("- lineIndex (should have noe egde lines): ", lineIndex.debugIndex());
+            console.log("- lineIndex (should have no egde lines): ", lineIndex.debugIndex());
         // handle inner self-closed lines (rings/polygons) that never touched edges
         // depending on winding they denote higher or lower terrain
         // ccw: denotes higher terrain - can just be added as polygons
