@@ -1478,106 +1478,99 @@
         });
         // remove tiny peaks (ignored)
         lineIndex.removeFromSearch(lineIndex.getRingPeaksTiny());
-        /****
-         *  handles very special case for fullTile
-         *
-         */
-        let fullTileAdded = false;
-        const fullTileHoles = lineIndex.getRingHoles();
-        const fullTilePeaks = lineIndex.getRingPeaks();
-        const fullTileTinyHoles = lineIndex.getRingHolesTiny();
-        const hasRemainingTinyHoles = fullTileTinyHoles.length;
-        const noPolysCreated = newLines.length == 0;
-        const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
-        if (dbg >= 1) {
-            console.log("fullTile special handling:");
-            console.log({ fullTilePeaks, fullTileHoles, fullTileTinyHoles, tileInfo, noPolysCreated, tileMinLowerThanLevel, });
-            console.log("- lineIndex: ", lineIndex.debugIndex());
-        }
-        // 
-        // case1:
-        // - tile min elevation is lower than this level (regular full tile condition not met)
-        // - there are tiny holes that have been ignored
-        // - no polygons have been created 
-        // - no uncontained peaks
-        const case1 = noPolysCreated && tileMinLowerThanLevel && hasRemainingTinyHoles;
-        if (case1) {
-            if (dbg >= 1) {
-                console.log("fullTile-special case1: tileMinLowerThanLevel && noPolysCreated && hasRemainingTinyHoles");
-            }
-            const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
-            newLines.push(fullTile);
-            fullTileAdded = true;
-        }
-        lineIndex.removeFromSearch(fullTileTinyHoles);
-        // case 2:  proper/valid holes (not contained in any high polygon). 
-        // they are contained in a fulltile polygon that will be created
-        try {
-            if (fullTileHoles.length > 0) {
-                // holes inside other polygons on this level
-                if (dbg >= 1)
-                    console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles));
-                if (fullTileAdded)
-                    throw new Error("full tile was already added");
-                if (newLines.length)
-                    throw new Error("created polygons exist, no fulltile possible");
-                // check preconditions
-                if (fullTilePeaks.length > 0)
-                    throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled peaks(${fullTilePeaks.length}), not handled `);
-                // these cases are not handled correctly, must be holes in other polygons
-                //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
-                if (lineIndex.remainEdgeCount > 0)
-                    throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainEdgeCount: ${lineIndex.remainEdgeCount}`);
-                // add as holes to full tile poly
-                if (dbg >= 1)
-                    console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `);
-                const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
-                newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line));
-                lineIndex.removeFromSearch(fullTileHoles);
-            }
-        }
-        catch (e) {
-            console.log("ERROR innerPoly LOW handling, tile:" + tileInfo.coordString());
-            console.log(e);
-            console.log({ tops: lineArrayToStrings(fullTilePeaks), holes: lineArrayToStrings(fullTileHoles) });
-            console.log("----------------- ");
-        }
-        const remainingInnerRingsHigh = lineIndex.getRingPeaks();
-        // add remaining TOP-rings (that have not been added before)
-        if (remainingInnerRingsHigh.length > 0) {
+        // add isolated peak-Rings (that have not been added before)
+        const isolatedPeaks = lineIndex.getRingPeaks();
+        if (isolatedPeaks.length > 0) {
             if (dbg >= 1)
-                console.log("remainingInnerRingsHigh: ", lineArrayToStrings(remainingInnerRingsHigh));
-            remainingInnerRingsHigh.forEach(l => {
+                console.log("isolatedPeaks: ", lineArrayToStrings(isolatedPeaks));
+            isolatedPeaks.forEach(l => {
                 if (l.line)
                     newLines.push(l.line);
                 lineIndex.removeFromSearch(l);
             });
-            //lineIndex.inner = lineIndex.inner.filter(l => l.winding !== "ccw");
         }
-        // remove tiny peaks (ignored)
-        lineIndex.removeFromSearch(lineIndex.getRingPeaksTiny());
-        // handles very special case for fullTile
-        // 
-        // conditions:
-        // - tile min elevation is lower than this level (regular full tile condition not met)
-        // - there are tiny holes that have been ignored
-        // - no polygons have been created 
-        // 
-        if (noPolysCreated && tileMinLowerThanLevel && hasRemainingTinyHoles) {
+        const noPolysCreated = newLines.length == 0;
+        if (noPolysCreated) {
+            if (dbg >= 0)
+                console.log("no polys created, check fulltile");
+            /****
+             *  handles  special case for fullTile
+             */
+            let fullTileAdded = false;
+            const fullTileHoles = lineIndex.getRingHoles();
+            const fullTilePeaks = lineIndex.getRingPeaks();
+            const fullTileTinyHoles = lineIndex.getRingHolesTiny();
+            fullTileTinyHoles.length;
+            const hasOnlyTinyHolesRemaining = (!fullTileHoles.length && !fullTilePeaks.length && fullTileTinyHoles.length);
+            const tileMinLowerThanLevel = tileInfo.min || Infinity < lvl;
             if (dbg >= 1) {
-                console.log("fullTile special case: tileMinLowerThanLevel && noPolysCreated && hasRemainingTinyHoles");
-                console.log({ tileInfo, hasRemainingTinyHoles });
+                console.log("check if fulltile required:");
+                console.log({ hasOnlyTinyHolesRemaining, tileInfo, noPolysCreated, tileMinLowerThanLevel, rings: { fullTilePeaks, fullTileHoles, fullTileTinyHoles } });
+                console.log("- lineIndex: ", lineIndex.debugIndex());
             }
-            const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
-            newLines.push(fullTile);
-        }
+            // 
+            // case1:
+            // - tile min elevation is lower than this level (regular full tile condition not met)
+            // - there are only tiny holes that have been ignored
+            // - no other uncontained peaks/holes
+            const case1 = noPolysCreated && tileMinLowerThanLevel && hasOnlyTinyHolesRemaining;
+            if (case1) {
+                if (dbg >= 1) {
+                    console.log("fullTile-special case1: tileMinLowerThanLevel && noPolysCreated && hasOnlyTinyHolesRemaining");
+                }
+                const fullTile = LineIndex.getFullTilePolygon(tileInfo.minXY, tileInfo.maxXY);
+                newLines.push(fullTile);
+                fullTileAdded = true;
+            }
+            lineIndex.removeFromSearch(fullTileTinyHoles);
+            //
+            // case 2:  remaining holes (not contained in any high polygon). 
+            // they are contained in a fulltile polygon that will be created
+            try {
+                if (fullTileHoles.length && fullTilePeaks.length == 0) {
+                    // holes inside other polygons on this level
+                    if (dbg >= 1)
+                        console.log("uncontained holes (for full-tile): ", lineArrayToStrings(fullTileHoles));
+                    if (fullTileAdded)
+                        throw new Error("full tile was already added");
+                    if (newLines.length)
+                        throw new Error("created polygons exist, no fulltile possible");
+                    // check preconditions
+                    if (fullTilePeaks.length > 0)
+                        throw new Error(`uncontained holes(${fullTileHoles.length}) + unhandled peaks(${fullTilePeaks.length}), not handled `);
+                    // these cases are not handled correctly, must be holes in other polygons
+                    //if (lineIndex.finalPool.length > 0) throw new Error(`innerPolys LOW (${innerLowPolygonsCW.length}) + non-inner/final polys ((${lineIndex.finalPool.length})) `)
+                    if (lineIndex.remainEdgeCount > 0)
+                        throw new Error(`innerPolys LOW (${fullTileHoles.length}) +  remainEdgeCount: ${lineIndex.remainEdgeCount}`);
+                    // add as holes to full tile poly
+                    if (dbg >= 1)
+                        console.log(` add fullTileCCW (high) + holes:${fullTileHoles.length} `);
+                    const fullTileCCW = [-32, -32, -32, 4128, 4128, 4128, 4128, -32, -32, -32];
+                    newLines.push(fullTileCCW, ...fullTileHoles.map(l => l.line));
+                    lineIndex.removeFromSearch(fullTileHoles);
+                }
+            }
+            catch (e) {
+                console.log("ERROR full tile with holes, tile:" + tileInfo.coordString());
+                console.log(e);
+                console.log({ tops: lineArrayToStrings(fullTilePeaks), holes: lineArrayToStrings(fullTileHoles) });
+                console.log("----------------- ");
+            }
+            if (dbg >= 0)
+                console.log("no fulltile added");
+        } // noPolysCreated
+        // final cleanup - remove ignored stuff
         // no only tiny rings (tops, holes) should exist if at all
-        lineIndex.removeFromSearch(fullTileTinyHoles);
+        const finalIgnoreUnhandledTinyHoles = lineIndex.getRingHolesTiny();
+        if (finalIgnoreUnhandledTinyHoles.length) {
+            console.error("skip finalIgnoreUnhandledTinyHoles:", lineArrayToStrings(finalIgnoreUnhandledTinyHoles), tileInfo.toString());
+            lineIndex.removeFromSearch(finalIgnoreUnhandledTinyHoles);
+        }
         //sometimes holes remain that are not handled before
-        const uncontainedWarnHoles = lineIndex.getRingHoles();
-        if (uncontainedWarnHoles.length) {
-            console.error("ignore uncontained holes: " + uncontainedWarnHoles.length, lineArrayToStrings(uncontainedWarnHoles), tileInfo.toString());
-            lineIndex.removeFromSearch(uncontainedWarnHoles);
+        const finalWarnIgnoreHoles = lineIndex.getRingHoles();
+        if (finalWarnIgnoreHoles.length) {
+            console.error("ignore finalWarnIgnoreHoles: " + finalWarnIgnoreHoles.length, lineArrayToStrings(finalWarnIgnoreHoles), tileInfo.toString());
+            lineIndex.removeFromSearch(finalWarnIgnoreHoles);
         }
         // no lines should remain
         if (dbg >= 1)
@@ -1592,7 +1585,7 @@
         if (dbg >= 1)
             console.log("END -- createIsoPolys ------", lineIndex);
         return newLines;
-    }
+    } // convertTileIsolinesToPolygons
     function pointInPolygonFlat(px, py, polygon) {
         let inside = false;
         const len = polygon.length;
