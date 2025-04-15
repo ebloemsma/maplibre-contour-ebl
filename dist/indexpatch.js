@@ -973,11 +973,6 @@
             };
             return Object.assign(new TileEdgeLineIndex(), indexData);
         }
-        findNext(line) {
-            const point = line.end;
-            const edge = line.brd.end;
-            return this.findNext2(point, edge, "start");
-        }
         static findOnEdge(lineIndex, edge, startOrEnd, mode, point) {
             if (!startOrEnd)
                 throw new Error("startOrEnd is invalid: ");
@@ -986,13 +981,12 @@
                 return undefined;
             if (!point && mode != "first")
                 throw new Error("point is missing for mode: " + mode);
-            if (!point)
-                throw new Error("point is missing for mode: " + mode);
             // console.log("findOnEdge",edge,startOrEnd,mode,point)
             // const lineStartOrEnd = lineCandiates;//.map(l => l[startOrEnd]).filter(c=>c)
             // EIKE: warning this is complex
             if (mode == "after") {
-                // if (!point) throw new Error("point is missing for mode: " + mode)
+                if (!point)
+                    throw new Error("point is missing for mode: " + mode);
                 if (edge == 1)
                     return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x >= point.x);
                 if (edge == 2)
@@ -1004,7 +998,8 @@
                 throw new Error("findOnEdge: invalid edge " + edge);
             }
             else if (mode == "before") {
-                // if (!point) throw new Error("point is missing for mode: " + mode)
+                if (!point)
+                    throw new Error("point is missing for mode: " + mode);
                 if (edge == 1)
                     return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x < point.x);
                 if (edge == 2)
