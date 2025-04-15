@@ -471,6 +471,73 @@
                 }
             }
         }
+
+        /**
+ * Checks how many rectangle corners are passed by a line.
+ * @param {number[]} line - Line defined as [x1, y1, x2, y2, ...]
+ * @param {Object} rect - Rectangle defined by {minX, minY, maxX, maxY}
+ * @returns {number} - Number of rectangle corners touched by the line
+ */
+function countCornersPassed(line) {
+    const rect = { minX: -32, minY: -32, maxX: 4128, maxY: 4128 };
+    const corners = [
+        [rect.minX, rect.minY],
+        [rect.minX, rect.maxY],
+        [rect.maxX, rect.minY],
+        [rect.maxX, rect.maxY]
+    ];
+
+    // Helper to check if point lies exactly on the line segment
+    function pointOnSegment(px, py, x1, y1, x2, y2) {
+        const cross = (px - x1) * (y2 - y1) - (py - y1) * (x2 - x1);
+        if (Math.abs(cross) > 1e-10) return false;
+
+        const dot = (px - x1) * (px - x2) + (py - y1) * (py - y2);
+        return dot <= 0;
+    }
+
+    let count = 0;
+    for (const [cx, cy] of corners) {
+        for (let i = 0; i < line.length - 2; i += 2) {
+            if (pointOnSegment(cx, cy, line[i], line[i + 1], line[i + 2], line[i + 3])) {
+                count++;
+                break; // Don't count the same corner more than once
+            }
+        }
+    }
+
+    return count;
+}
+
+        function  doesLineIntersectItself(coords) {
+            // Convert flat array to point array
+            const points = [];
+            for (let i = 0; i < coords.length; i += 2) {
+                points.push([coords[i], coords[i + 1]]);
+            }
+        
+            function segmentsIntersect(p1, p2, q1, q2) {
+                function ccw(a, b, c) {
+                    return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0]);
+                }
+                return (
+                    ccw(p1, q1, q2) !== ccw(p2, q1, q2) &&
+                    ccw(p1, p2, q1) !== ccw(p1, p2, q2)
+                );
+            }
+        
+            for (let i = 0; i < points.length - 1; i++) {
+                for (let j = i + 2; j < points.length - 1; j++) {
+                    // Skip adjacent segments and the first-last segment if open line
+                    if (i === 0 && j === points.length - 2) continue;
+                    if (segmentsIntersect(points[i], points[i + 1], points[j], points[j + 1])) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function findBorder(x, y, minXY, maxXY) {
             let left = x == minXY;
             let top = y == minXY;
@@ -614,8 +681,10 @@
             const signedArea = area / 2;
             const absoluteArea = Math.abs(signedArea);
             const winding = signedArea < 0 ? 'ccw' : 'cw';
+            const areaFactor = absoluteArea / (4128*4128)
             return {
                 //isTiny,
+                areaFactor,
                 signedArea,
                 area: absoluteArea,
                 length: perimeter,
@@ -675,6 +744,7 @@
                 // cw : inner lower
                 // ccw: inner is higher
                 this.bbox = getLineBBox(l);
+                this.info={}
                 if (this.isClosed) {
                     const polyInfo = analyzePolygon(this.line);
                     this.info = polyInfo;
@@ -683,6 +753,7 @@
                     this.winding = polyInfo.winding;
                     this.area = polyInfo.area;
                 }
+                this.info.corners = countCornersPassed(l);
             }
             clone() {
                 const line = new TiledLine(this.line, this.minXY, this.maxXY);
@@ -1252,11 +1323,11 @@
                 return line;
             }
             createConcatedLine(lineIn, buffer, minXY, maxXY) {
-                const dbg = `${0}`;
+                const dbg = `${1}`;
                 const bufferRev = [...buffer].reverse();
                 const line = lineIn.clone();
                 if (dbg == "1")
-                    console.log("appendLinesToClone", bufferRev);
+                    console.log("appendLinesToClone'()", lineIn, buffer);
                 for (const buffLine of bufferRev) {
                     // buffLine is appended 
                     // buffline start will always be before
@@ -1269,7 +1340,7 @@
                     // insert corners if req
                     line.appendCornersAtEnd(corners, minXY, maxXY);
                     if (dbg == "1")
-                        console.log("appendLinesToClone - add line: ", buffLine);
+                        console.log("appendLinesToClone - add line: ", buffLine.toString() ,buffLine);
                     line.appendLine(buffLine, minXY, maxXY);
                 }
                 this.closeLine(line, minXY, maxXY);
@@ -1294,7 +1365,7 @@
         function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
             var _a;
             // SET-DBG convertTileIsolinesToPolygons 
-            const dbg = Number(`${1}`);
+            const dbg = Number(`${2}`);
             // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
             // filter out lines that are not valid, too small
             const lines = linesIn.filter(l => l.length > 6);
@@ -1355,7 +1426,7 @@
                     break;
                 }
                 if (dbg >= 2)
-                    console.log(`close Line (${i}) START`, currentEdgeLine);
+                    console.log(`close Line (${i}) START`, currentEdgeLine.toString(),currentEdgeLine);
                 let linesToAppend = [];
                 let currentAppendCandidateLine = currentEdgeLine;
                 // look for all other edge-lines in clockwise direction if they may be concat to currentLines
@@ -1378,7 +1449,7 @@
                         }
                         if (nextAppendCandidate) {
                             if (dbg >= 2)
-                                console.log(`close line(${i} - append line:`, nextAppendCandidate);
+                                console.log(`close line(${i} - append line:`, nextAppendCandidate.toString());
                             linesToAppend.push(nextAppendCandidate);
                         }
                         currentAppendCandidateLine = nextAppendCandidate;
@@ -1389,16 +1460,28 @@
                     }
                 }
                 const concatedLine = lineIndex.createConcatedLine(currentEdgeLine, linesToAppend, minXY, maxXY);
+
+                if( concatedLine.info.areaFactor > 1 ){
+                    console.error("concat line area max: ", concatedLine,currentEdgeLine)
+
+                    return [concatedLine.line]
+                } 
                 concatedPolygonsArray.push(concatedLine);
-                //lineIndex.addToFinal(concatedLine)
                 lineIndex.removeFromSearch(currentEdgeLine);
                 linesToAppend.forEach(l => lineIndex.removeFromSearch(l));
+                
+                //lineIndex.addToFinal(concatedLine)
+                 
                 currentEdgeLine = lineIndex.getFirst();
             }
             if (dbg >= 1)
                 console.log("- concatedPolygons: ", lineArrayToStrings(concatedPolygonsArray));
+
+
+
+
             if (dbg >= 1)
-                console.log("- lineIndex (should have noe egde lines): ", lineIndex.debugIndex());
+                console.log("- lineIndex (should have no egde lines): ", lineIndex.debugIndex());
             // handle inner self-closed lines (rings/polygons) that never touched edges
             // depending on winding they denote higher or lower terrain
             // ccw: denotes higher terrain - can just be added as polygons
@@ -1560,7 +1643,18 @@
             }
             if (dbg >= 1)
                 console.log("END -- createIsoPolys ------", lineIndex);
-            return newLines;
+
+            
+            newLines.forEach( l=> {
+                const corners = countCornersPassed(l);
+                if (corners>3) {
+                   console.log("corners: " + corners, l.length )
+                }
+             })
+
+        
+
+            return newLines 
         }
         function pointInPolygonFlat(px, py, polygon) {
             let inside = false;
