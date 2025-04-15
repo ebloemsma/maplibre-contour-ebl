@@ -54,7 +54,7 @@ const layerVisibleSingle = ref([])
 const layerVisibleGroup = reactive({})
 
 
-const demOptionsAltitude = ref(1289);
+const demOptionsAltitude = ref(3606);
 const demOptionsPolygons = ref(true)
 const demOptionsMode = ref("line")
 

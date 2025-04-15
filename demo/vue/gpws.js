@@ -16,9 +16,7 @@ const gpwsLevelsCfg = [
 function createGpwsLevel(altitude, levelCfg) {
 
     const refAltitude = Number(altitude)
-
     const lowCutOutElevation = 30;
-
     const useCfg = gpwsPatterns
     const gpwsLevels = Object.keys(useCfg).map(k => Number(k)).sort((a, b) => b - a).map(rl => [rl, rl + refAltitude])
 
@@ -47,11 +45,8 @@ function createGpwsLevel(altitude, levelCfg) {
 
 
 function GetOptionsGpwsLevels (altitude) {
-
     const gpwsLevels = createGpwsLevel(altitude);
     //console.log("createGpwsLevel", gpwsLevels.map(e => [e.level, e.addProperties.gpwsPattern]))
-    
-    
     return gpwsLevels;
 }
 
