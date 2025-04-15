@@ -545,7 +545,7 @@
             }
         }
     }
-    function findBorder(x, y, minXY, maxXY) {
+    function findEdge(x, y, minXY, maxXY) {
         let left = x == minXY;
         let top = y == minXY;
         let right = x == maxXY;
@@ -560,6 +560,7 @@
             code = 1;
         if (code == 9)
             code = 8;
+        // TODO: catch other cases
         return code;
     }
     function hashArray(arr) {
@@ -605,7 +606,7 @@
             maxY
         };
     }
-    function getLineBorderCode(line, minXY, maxXY) {
+    function getLineEdgeInfo(line, minXY, maxXY) {
         if (!line)
             throw new Error("empty line");
         const l = line.length;
@@ -613,8 +614,8 @@
         let sy = line[0 + 1];
         let ex = line[l - 2];
         let ey = line[l - 1];
-        const start = findBorder(sx, sy, minXY, maxXY);
-        const end = findBorder(ex, ey, minXY, maxXY);
+        const start = findEdge(sx, sy, minXY, maxXY);
+        const end = findEdge(ex, ey, minXY, maxXY);
         return { start, end, code: [start, end] };
     }
     function generateFullTileIsoPolygons(fullTile, levels, minXY, maxXY, x, y, z) {
@@ -744,7 +745,7 @@
             if (!this.line)
                 throw new Error("empty this.line");
             const l = this.line;
-            const border = getLineBorderCode(l, minXY, maxXY);
+            const border = getLineEdgeInfo(l, minXY, maxXY);
             this.start = getLineFirst(l);
             this.end = getLineLast(l);
             this.brd = border;
@@ -822,9 +823,15 @@
         }
         toString() {
             return this.toString2();
+            // const l = this;
+            // if (l.isClosed) {
+            //     return `#${l.hash} closed - tiny:${l.isTiny} area:${l.area} `
+            // }
+            // return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}] - [${l.end.x},${l.end.y}] len:${l.line?.length} `;
         }
         ;
         toString2(tileLineIndex) {
+            var _a, _b, _c, _d;
             const l = this;
             const winding = (l.winding) ? l.winding : "";
             const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
@@ -837,7 +844,7 @@
             if (l.isClosed) {
                 return `#${l.hash} ${closed} ${length} ${area} ${bbox} ${tiny}`;
             }
-            return `#${l.hash} ${length} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y}--${l.end.x},${l.end.y}] ${selfClosable} ${bbox}`;
+            return `#${l.hash} ${length} edges: ${l.brd.start}-${l.brd.end} [${(_a = l.start) === null || _a === undefined ? undefined : _a.x},${(_b = l.start) === null || _b === undefined ? undefined : _b.y} ~ ${(_c = l.end) === null || _c === undefined ? undefined : _c.x},${(_d = l.end) === null || _d === undefined ? undefined : _d.y}] ${selfClosable} ${bbox}`;
         }
     } // class TileLine
     const EDGES = [1, 2, 4, 8];
@@ -972,36 +979,40 @@
             return this.findNext2(point, edge, "start");
         }
         static findOnEdge(lineIndex, edge, startOrEnd, mode, point) {
+            if (!startOrEnd)
+                throw new Error("startOrEnd is invalid: ");
             let lineCandiates = LineIndex.getEdgeLisFromIndex(lineIndex, edge, startOrEnd);
             if (!lineCandiates)
                 return undefined;
             if (!point && mode != "first")
                 throw new Error("point is missing for mode: " + mode);
+            if (!point)
+                throw new Error("point is missing for mode: " + mode);
             // console.log("findOnEdge",edge,startOrEnd,mode,point)
+            // const lineStartOrEnd = lineCandiates;//.map(l => l[startOrEnd]).filter(c=>c)
+            // EIKE: warning this is complex
             if (mode == "after") {
-                if (!point)
-                    throw new Error("point is missing for mode: " + mode);
+                // if (!point) throw new Error("point is missing for mode: " + mode)
                 if (edge == 1)
-                    return lineCandiates.find(l => l[startOrEnd].x >= point.x);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x >= point.x);
                 if (edge == 2)
-                    return lineCandiates.find(l => l[startOrEnd].y > point.y);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].y > point.y);
                 if (edge == 4)
-                    return lineCandiates.find(l => l[startOrEnd].x < point.x);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x < point.x);
                 if (edge == 8)
-                    return lineCandiates.find(l => l[startOrEnd].y < point.y);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].y < point.y);
                 throw new Error("findOnEdge: invalid edge " + edge);
             }
             else if (mode == "before") {
-                if (!point)
-                    throw new Error("point is missing for mode: " + mode);
+                // if (!point) throw new Error("point is missing for mode: " + mode)
                 if (edge == 1)
-                    return lineCandiates.find(l => l[startOrEnd].x < point.x);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x < point.x);
                 if (edge == 2)
-                    return lineCandiates.find(l => l[startOrEnd].y < point.y);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].y < point.y);
                 if (edge == 4)
-                    return lineCandiates.find(l => l[startOrEnd].x > point.x);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].x > point.x);
                 if (edge == 8)
-                    return lineCandiates.find(l => l[startOrEnd].y > point.y);
+                    return lineCandiates.find(l => l[startOrEnd] && l[startOrEnd].y > point.y);
                 throw new Error("findOnEdge: invalid edge " + edge);
             }
             else if (mode == "first") {
@@ -1010,6 +1021,13 @@
             else {
                 throw new Error("findOnEdge: invalid mode " + mode);
             }
+        }
+        findNextConcatLine(line) {
+            const start = line.start;
+            const startEdge = line.brd.start;
+            if (!start)
+                throw new Error("start point missing");
+            return LineIndex.findNextEdgeLine(this.lineIndex, start, startEdge, "end");
         }
         findNext2(point, pointEdge, startOrEnd) {
             return LineIndex.findNextEdgeLine(this.lineIndex, point, pointEdge, startOrEnd);
@@ -1089,6 +1107,15 @@
             };
             const lineToString = (l) => {
                 return l.toString2();
+                // const winding = (l.winding) ? l.winding : "";
+                // const innerHighLow = (l.winding == "cw") ? "low" : (l.winding == "ccw" ? "high" : "");
+                // const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
+                // const tiny = (l.isTiny) ? "tiny," : "";
+                // let selfClosable = (this.lineIsSelfClosable(l)) ? "selfClosable" : "";
+                // if (l.isClosed) {
+                //     return `#${l.hash} ${closed} ${tiny} area:${l.area} `
+                // }
+                // return `#${l.hash} edges: ${l.brd.start}-${l.brd.end} [${l.start.x},${l.start.y} - ${l.end.x},${l.end.y} ${selfClosable}]`
             };
             for (const [edge, node] of Object.entries(lineIndex)) {
                 //console.log( edge, node)
@@ -1269,6 +1296,8 @@
                 return false; //throw new Error("isEndBeforeStartSameEdge: not on same edge");
             const end = line.end;
             const start = line.start;
+            if (!start || !end)
+                throw new Error("start,end invalid: start:" + start + " end:" + end);
             const startEdge = line.brd.start;
             if (startEdge == 1)
                 return (end.x < start.x && end.y == start.y);
@@ -1469,7 +1498,8 @@
                 //}
                 try {
                     //the next line which end is on the edge can be appended
-                    let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end");
+                    let nextAppendCandidate = lineIndex.findNextConcatLine(currentAppendCandidateLine);
+                    //let nextAppendCandidate = lineIndex.findNext2(currentAppendCandidateLine.start, currentAppendCandidateLine.brd.start, "end")
                     if (!nextAppendCandidate) {
                         console.log("ERROR: during appendLoop, next line is empty, count:" + appendLoopCount, { currentEdgeLine, currentAppendCandidateLine });
                         break;
