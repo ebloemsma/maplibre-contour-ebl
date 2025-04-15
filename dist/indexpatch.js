@@ -1387,8 +1387,8 @@
     function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
         var _a;
         // SET-DBG convertTileIsolinesToPolygons 
-        const dbg = Number(`${1}`);
-        // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
+        // const dbg = Number(`${0}`);
+        const dbg = Number(`${tileInfo.isTile(null, 37, 84) ? "1" : "0"}`);
         if (tileInfo.isTile(null, 37, 84)) {
             const line11CloseWithCorners = new TiledLine([2000, -32, 2000, 400, 1000, 400, 1000, -32], -32, 4128);
             const line11DirectCloseable = line11CloseWithCorners.cloneReversed();
