@@ -393,9 +393,38 @@
         }
         return count;
     }
+    function pointInPolygonFlat(px, py, polygon) {
+        let inside = false;
+        const len = polygon.length;
+        for (let i = 0, j = len - 2; i < len; j = i, i += 2) {
+            const xi = polygon[i], yi = polygon[i + 1];
+            const xj = polygon[j], yj = polygon[j + 1];
+            const intersect = ((yi > py) !== (yj > py)) &&
+                (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+            if (intersect)
+                inside = !inside;
+        }
+        return inside;
+    }
+    function isPolygonInsideFlat(innerFlat, outerFlat) {
+        for (let i = 0; i < innerFlat.length; i += 2) {
+            const x = innerFlat[i];
+            const y = innerFlat[i + 1];
+            if (!pointInPolygonFlat(x, y, outerFlat))
+                return false;
+        }
+        return true;
+    }
+    function lineArrayToStrings(lines) {
+        return lines.map(l => l.toString());
+    }
 
     class TileInformation {
         setTile(tile) {
+            const extent = 4096;
+            const multiplier = extent / (tile.width - 1);
+            this.minXY = -multiplier;
+            this.maxXY = extent + multiplier;
             const { edgeMin, edgeMax } = findTileEdgeMinMax(tile);
             this.edgeMin = Math.round(edgeMin);
             this.edgeMax = Math.round(edgeMax);
@@ -785,7 +814,7 @@
             const closed = (l.isClosed) ? `closed:${winding}/${innerHighLow},` : "";
             const tiny = (l.isTiny) ? "tiny," : "";
             const length = (l.line) ? "l:" + l.line.length + "," : "";
-            const area = (l.isClosed) ? `area:${l.info.area},` : "";
+            const area = (l.isClosed) ? `area:${l.info.area}/${l.info.areaFactor.toFixed(3)}%,` : "";
             const bbox = (l.bbox) ? `bbx: [${l.bbox.minX},${l.bbox.minY} - ${l.bbox.maxX},${l.bbox.maxY}],` : "";
             let selfClosable = (tileLineIndex === null || tileLineIndex === undefined ? undefined : tileLineIndex.lineIsSelfClosable(l)) ? "selfClosable" : "";
             if (l.isClosed) {
@@ -1208,25 +1237,29 @@
                 return (end.y > start.y && end.x == start.x);
             throw new Error("isEndBeforeStartSameEdge error");
         }
+        static lineSameEdgeClosableOverallCorners(line) {
+            return LineIndex.isEndBeforeStartSameEdge(line);
+        }
         /**
          * checks if the end point is on the same edge but before (counterclockwise) from start
+         * line is closable over all 4 edges !
          *
          * @param {*} line
          * @returns
          */
-        isEndBeforeStartSameEdge(line) {
+        static isEndBeforeStartSameEdge(line) {
             if (line.brd.end != line.brd.start)
                 return false; //throw new Error("isEndBeforeStartSameEdge: not on same edge");
             const end = line.end;
             const start = line.start;
-            const edge = line.brd.start;
-            if (edge == 1)
+            const startEdge = line.brd.start;
+            if (startEdge == 1)
                 return (end.x < start.x && end.y == start.y);
-            else if (edge == 2)
+            else if (startEdge == 2)
                 return (end.y < start.y && end.x == start.x);
-            else if (edge == 4)
+            else if (startEdge == 4)
                 return (end.x > start.x && end.y == start.y);
-            else if (edge == 8)
+            else if (startEdge == 8)
                 return (end.y > start.y && end.x == start.x);
             throw new Error("isEndBeforeStartSameEdge error");
         }
@@ -1260,12 +1293,16 @@
             // console.log("CLOSE Line count:", edgeFrom,edgeTo,count)
             return count;
         }
-        closeLine(line, minXY, maxXY) {
+        static closeLineCorners(line, minXY, maxXY) {
+        }
+        static closeLine(line, minXY, maxXY) {
             const startEdge = line.brd.start;
             const endEdge = line.brd.end;
             let count = 0;
-            const endBeforeOnSame = this.isEndBeforeStartSameEdge(line);
+            console.log("CLOSE line start->end: ", startEdge, endEdge);
+            const endBeforeOnSame = LineIndex.isEndBeforeStartSameEdge(line);
             if (endBeforeOnSame) {
+                console.log("- end is on same edge before, corner count: 4");
                 count = 4;
             }
             else {
@@ -1278,12 +1315,15 @@
                     const index = (startIndex + count) % 4;
                     edge = EDGES[index];
                 }
+                console.log("- corner count: ", count);
             }
             const corners = LineIndex.getTileCornersCounterClockWiseCount(endEdge, count, minXY, maxXY);
+            console.log("-corners: ", corners);
             // add corners reverse to the end
             //const lineClone = line.clone();        
             line.appendCornersAtEnd(corners, minXY, maxXY);
             line.closeLineStartEnd(minXY, maxXY);
+            console.log("NOW CLSD ", line);
             // add the start point at end
             return line;
         }
@@ -1308,7 +1348,7 @@
                     console.log("createConcatedLine - add line: ", buffLine);
                 line.appendLine(buffLine, minXY, maxXY);
             }
-            this.closeLine(line, minXY, maxXY);
+            LineIndex.closeLine(line, minXY, maxXY);
             return line;
         }
         checkAndClosableLine(line, minXY, maxXY) {
@@ -1330,10 +1370,10 @@
     function convertTileIsolinesToPolygons(lvl, linesIn, tileInfo) {
         var _a;
         // SET-DBG convertTileIsolinesToPolygons 
-        const dbg = Number(`${0}`);
+        const dbg = Number(`${1}`);
         // const dbg = Number(`${tileInfo.isTile(null, 11, 21) ? "1" : "0"}`);
         // filter out lines that are not valid, too small
-        const lines = linesIn.filter(l => l.length > 6);
+        const lines = linesIn.filter(l => l.length >= 6);
         if (!lines || lines.length < 1) {
             // no valid lines available
             // handles special cases - where full tile is required
@@ -1586,31 +1626,6 @@
             console.log("END -- createIsoPolys ------", lineIndex);
         return newLines;
     } // convertTileIsolinesToPolygons
-    function pointInPolygonFlat(px, py, polygon) {
-        let inside = false;
-        const len = polygon.length;
-        for (let i = 0, j = len - 2; i < len; j = i, i += 2) {
-            const xi = polygon[i], yi = polygon[i + 1];
-            const xj = polygon[j], yj = polygon[j + 1];
-            const intersect = ((yi > py) !== (yj > py)) &&
-                (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-            if (intersect)
-                inside = !inside;
-        }
-        return inside;
-    }
-    function isPolygonInsideFlat(innerFlat, outerFlat) {
-        for (let i = 0; i < innerFlat.length; i += 2) {
-            const x = innerFlat[i];
-            const y = innerFlat[i + 1];
-            if (!pointInPolygonFlat(x, y, outerFlat))
-                return false;
-        }
-        return true;
-    }
-    function lineArrayToStrings(lines) {
-        return lines.map(l => l.toString());
-    }
 
     /*
     Adapted from d3-contour https://github.com/d3/d3-contour
