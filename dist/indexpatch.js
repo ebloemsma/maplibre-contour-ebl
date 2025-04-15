@@ -1389,7 +1389,17 @@
         // SET-DBG convertTileIsolinesToPolygons 
         // const dbg = Number(`${0}`);
         const dbg = Number(`${tileInfo.isTile(null, 37, 84) ? "1" : "0"}`);
-        if (tileInfo.isTile(null, 37, 84)) ;
+        if (tileInfo.isTile(null, 37, 84)) {
+            // const lineOuter = new TiledLine([1000,-32,  1000,400,  2000,400,  2000,-32 ],-32,4128)
+            // const lineInner = new TiledLine([1500,-32,  1500,200,  1250,200,  1000,-32 ],-32,4128)
+            linesIn = [
+                [1000, -32, 1000, 400, 2000, 400, 2000, -32],
+                [1500, -32, 1500, 200, 1250, 200, 1000, -32]
+            ];
+            // const closed = LineIndex.closeLine(line11DirectCloseable,-32,4128)
+            // console.log("## FAKE",closed.toString(),closed)
+            // return [closed.line]
+        }
         // filter out lines that are not valid, too small
         const lines = linesIn.filter(l => l.length >= 6);
         if (!lines || lines.length < 1) {
